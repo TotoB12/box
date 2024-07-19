@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Box</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+</head>
+<body>
+    <button id="settingsBtn"><i class="fas fa-cog"></i></button>
+    <div class="container">
+        <h1>Box</h1>
+        <p>Join as <span id="currentUserName" class="user-name"></span>. <span class="settings-link" onclick="openSettings()">Change?</span></p>
+        <div class="form-group">
+            <label for="roomId">Room Code:</label>
+            <input type="text" id="roomId" placeholder="Enter 4-digit room code">
+        </div>
+        <button id="joinRoom">Join Room</button>
+    </div>
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
+            <h2>Settings</h2>
+            <div class="form-group">
+                <label for="updateUserName">Update Your Name:</label>
+                <input type="text" id="updateUserName">
+            </div>
+            <button id="updateNameBtn">Update</button>
+            <button id="closeModal">Close</button>
+        </div>
+    </div>
+    <script src="client.js"></script>
+</body>
+</html>
