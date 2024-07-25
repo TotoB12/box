@@ -1,4 +1,3 @@
-/* Common styles for both pages */
 :root {
   --bg-color: #121212;
   --surface-color: #1e1e1e;
@@ -233,6 +232,7 @@ input[type="text"]:focus {
   border-radius: 4px;
   display: flex;
   align-items: center;
+  justify-content: space-between;
 }
 
 .user-item::before {
@@ -241,6 +241,31 @@ input[type="text"]:focus {
   font-weight: 900;
   margin-right: 0.5rem;
   color: var(--primary-color);
+}
+
+.network-speed {
+  display: flex;
+  align-items: center;
+}
+
+.network-bar {
+  width: 4px;
+  height: 8px;
+  margin-right: 2px;
+  background-color: var(--text-secondary);
+  border-radius: 1px;
+}
+
+.network-bar.active {
+  background-color: var(--green-color);
+}
+
+.network-bar.active.medium {
+  background-color: var(--secondary-color);
+}
+
+.network-bar.active.slow {
+  background-color: var(--error-color);
 }
 
 .modal {
@@ -300,7 +325,7 @@ input[type="text"]:focus {
 .user-name {
   font-weight: bold;
   color: var(--primary-color);
-  margin-right: 1em;
+  margin-right: 0.2em;
 }
 
 .settings-link {
@@ -316,7 +341,7 @@ input[type="text"]:focus {
 .toggle-wrapper {
   display: flex;
   align-items: center;
-  /* margin: 0 1rem; */
+  margin-left: 0.3em;
 }
 
 .toggle-input {
@@ -363,11 +388,11 @@ input[type="text"]:focus {
 }
 
 .mic-on {
-  color: var(--green-color);  /* Green color */
+  color: var(--green-color);
 }
 
 .mic-off {
-  color: var(--red-color);  /* Red color */
+  color: var(--red-color);
 }
 
 .room-container {
@@ -401,7 +426,6 @@ input[type="text"]:focus {
   margin-left: 0.5rem;
   width: 80px;
   text-align: center;
-  /* font-family: 'Courier New', Courier, monospace; */
 }
 
 .loading-animation {
