@@ -189,6 +189,10 @@ function updateUserList(users) {
             const userName = document.createElement("span");
             userName.textContent = user.name;
 
+            const muteIcon = document.createElement("i");
+            muteIcon.className = user.muted ? "fas fa-microphone-slash mic-off" : "fas fa-microphone mic-on";
+            muteIcon.style.marginLeft = "10px";
+
             const networkSpeed = document.createElement("div");
             networkSpeed.className = "network-speed";
             for (let i = 0; i < 3; i++) {
@@ -197,6 +201,7 @@ function updateUserList(users) {
                 networkSpeed.appendChild(bar);
             }
 
+            userItem.appendChild(muteIcon);
             userItem.appendChild(userName);
             userItem.appendChild(networkSpeed);
             userListContainer.appendChild(userItem);
@@ -324,6 +329,9 @@ function toggleMicrophone() {
     if (localStream) {
         const audioTrack = localStream.getAudioTracks()[0];
         audioTrack.enabled = micSwitch.checked;
+        if (socket) {
+            socket.emit("mute-status", !audioTrack.enabled);
+        }
     }
 }
 

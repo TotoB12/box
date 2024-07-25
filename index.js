@@ -41,9 +41,9 @@ io.on("connection", (socket) => {
     if (!rooms.has(roomId)) {
       rooms.set(roomId, new Map());
     }
-    rooms.get(roomId).set(socket.id, { id: socket.id, name: userName });
+    rooms.get(roomId).set(socket.id, { id: socket.id, name: userName, muted: false });
 
-    io.to(roomId).emit("user-connected", { id: socket.id, name: userName });
+    io.to(roomId).emit("user-connected", { id: socket.id, name: userName, muted: false });
     io.to(roomId).emit("update-user-list", Array.from(rooms.get(roomId).values()));
 
     socket.on("disconnect", () => {
@@ -57,6 +57,16 @@ io.on("connection", (socket) => {
         if (user) {
           user.name = newName;
           currentUserName = newName;
+          io.to(currentRoom).emit("update-user-list", Array.from(rooms.get(currentRoom).values()));
+        }
+      }
+    });
+
+    socket.on("mute-status", (muted) => {
+      if (currentRoom && rooms.has(currentRoom)) {
+        const user = rooms.get(currentRoom).get(socket.id);
+        if (user) {
+          user.muted = muted;
           io.to(currentRoom).emit("update-user-list", Array.from(rooms.get(currentRoom).values()));
         }
       }
