@@ -247,6 +247,30 @@ function toggleMicrophone() {
     }
 }
 
+function updateMicIcon(isOn) {
+    const micIcon = document.querySelector('.mic-icon');
+    if (isOn) {
+        micIcon.classList.remove('fa-microphone-slash', 'mic-off');
+        micIcon.classList.add('fa-microphone', 'mic-on');
+    } else {
+        micIcon.classList.remove('fa-microphone', 'mic-on');
+        micIcon.classList.add('fa-microphone-slash', 'mic-off');
+    }
+}
+
+// Event listener for microphone toggle
+if (micSwitch) {
+    micSwitch.addEventListener('change', function() {
+        toggleMicrophone();
+        updateMicIcon(this.checked);
+    });
+}
+
+// Initial icon state
+if (micSwitch) {
+    updateMicIcon(micSwitch.checked);
+}
+
 function updateUserName() {
     const newName = document.getElementById('updateUserName').value.trim();
     if (newName && newName !== userName) {

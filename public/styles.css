@@ -8,6 +8,8 @@
   --text-color: #ffffff;
   --text-secondary: #b0b0b0;
   --error-color: #cf6679;
+  --green-color: #4CAF50;
+  --red-color: #F44336;
 }
 
 * {
@@ -97,37 +99,120 @@ input[type="text"]:focus {
 }
 
 .btn-primary, .btn-secondary {
-  display: block;
-  width: 100%;
-  padding: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 1.5rem;
   border: none;
-  border-radius: 4px;
+  border-radius: 25px;
   cursor: pointer;
   font-size: 1rem;
-  font-weight: 500;
+  font-weight: 600;
   text-transform: uppercase;
-  transition: background-color 0.3s ease, transform 0.1s ease;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
   font-family: 'Poly Sans', 'Roboto', 'Arial', sans-serif;
 }
 
 .btn-primary {
   background-color: var(--primary-color);
   color: var(--bg-color);
+  box-shadow: 0 4px 6px rgba(187, 134, 252, 0.3);
 }
 
 .btn-secondary {
   background-color: var(--surface-color);
-  color: var(--text-color);
-  border: 1px solid var(--primary-color);
+  color: var(--primary-color);
+  border: 2px solid var(--primary-color);
+  box-shadow: 0 4px 6px rgba(187, 134, 252, 0.2);
 }
 
 .btn-primary:hover, .btn-secondary:hover {
-  filter: brightness(1.1);
-  transform: translateY(-1px);
+  transform: translateY(-3px);
+  box-shadow: 0 6px 8px rgba(187, 134, 252, 0.4);
 }
 
 .btn-primary:active, .btn-secondary:active {
   transform: translateY(1px);
+  box-shadow: 0 2px 4px rgba(187, 134, 252, 0.4);
+}
+
+.btn-primary::after, .btn-secondary::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  background: rgba(255, 255, 255, 0.5);
+  opacity: 0;
+  border-radius: 100%;
+  transform: scale(1, 1) translate(-50%);
+  transform-origin: 50% 50%;
+}
+
+@keyframes ripple {
+  0% {
+    transform: scale(0, 0);
+    opacity: 1;
+  }
+  20% {
+    transform: scale(25, 25);
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(40, 40);
+  }
+}
+
+.btn-primary:focus:not(:active)::after,
+.btn-secondary:focus:not(:active)::after {
+  animation: ripple 1s ease-out;
+}
+
+#updateNameBtn {
+  background-color: var(--secondary-color);
+  color: var(--bg-color);
+}
+
+#closeModal {
+  background-color: var(--surface-color);
+  color: var(--text-color);
+  border: 2px solid var(--text-color);
+}
+
+#joinRoom {
+  background-image: linear-gradient(45deg, var(--primary-color), var(--secondary-color));
+  color: var(--bg-color);
+  font-size: 1.1rem;
+  padding: 1rem 2rem;
+  position: relative;
+  z-index: 1;
+  transition: all 0.3s ease;
+}
+
+#joinRoom::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background-image: linear-gradient(45deg, var(--secondary-color), var(--primary-color));
+  z-index: -1;
+  transition: opacity 0.5s ease;
+  opacity: 0;
+}
+
+#joinRoom:hover::before {
+  opacity: 1;
+}
+
+#joinRoom:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 8px rgba(187, 134, 252, 0.4);
 }
 
 .user-controls {
@@ -215,6 +300,7 @@ input[type="text"]:focus {
 .user-name {
   font-weight: bold;
   color: var(--primary-color);
+  margin-right: 1em;
 }
 
 .settings-link {
@@ -230,6 +316,7 @@ input[type="text"]:focus {
 .toggle-wrapper {
   display: flex;
   align-items: center;
+  /* margin: 0 1rem; */
 }
 
 .toggle-input {
@@ -238,33 +325,49 @@ input[type="text"]:focus {
 
 .toggle-label {
   display: inline-block;
-  width: 48px;
-  height: 24px;
+  width: 60px;
+  height: 34px;
   background-color: var(--surface-color);
-  border-radius: 12px;
+  border-radius: 17px;
   position: relative;
   cursor: pointer;
-  margin: 0.5rem 0.5rem;
+  transition: background-color 0.3s ease;
 }
 
 .toggle-button {
-  width: 20px;
-  height: 20px;
+  width: 26px;
+  height: 26px;
   background-color: var(--text-color);
   border-radius: 50%;
   position: absolute;
-  top: 2px;
-  left: 2px;
-  transition: transform 0.3s ease;
-}
-
-.toggle-input:checked + .toggle-label .toggle-button {
-  transform: translateX(24px);
-  background-color: var(--primary-color);
+  top: 4px;
+  left: 4px;
+  transition: transform 0.3s ease, background-color 0.3s ease;
 }
 
 .toggle-input:checked + .toggle-label {
   background-color: var(--primary-variant);
+}
+
+.toggle-input:checked + .toggle-label .toggle-button {
+  transform: translateX(26px);
+  background-color: var(--primary-color);
+}
+
+.mic-icon {
+  font-size: 1.2rem;
+  width: 30px;
+  text-align: center;
+  margin-left: 0.5rem;
+  transition: color 0.3s ease;
+}
+
+.mic-on {
+  color: var(--green-color);  /* Green color */
+}
+
+.mic-off {
+  color: var(--red-color);  /* Red color */
 }
 
 .room-container {
@@ -296,6 +399,9 @@ input[type="text"]:focus {
   font-size: 1rem;
   color: var(--text-secondary);
   margin-left: 0.5rem;
+  width: 80px;
+  text-align: center;
+  /* font-family: 'Courier New', Courier, monospace; */
 }
 
 .loading-animation {
