@@ -3,37 +3,40 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Box - Room</title>
-    <link rel="stylesheet" href="styles.css">
+    <title>Box</title>
+    <link rel="stylesheet" href="/styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
 </head>
 <body>
-    <button id="settingsBtn"><i class="fas fa-cog"></i></button>
-    <div class="container">
-        <div class="user-controls">
+    <div class="container room-container">
+        <div class="room-header">
             <h1>Room: <span id="roomDisplay"></span></h1>
-            <div id="micToggle">
-                <label class="switch">
-                    <input type="checkbox" id="micSwitch" checked>
-                    <span class="slider"></span>
-                </label>
-                <i class="fas fa-microphone"></i>
+            <div class="user-controls">
+                <span id="currentUserName" class="user-name"></span>
+                <div id="micToggle" class="toggle-wrapper">
+                    <input type="checkbox" id="micSwitch" class="toggle-input" checked>
+                    <label for="micSwitch" class="toggle-label">
+                        <span class="toggle-button"></span>
+                    </label>
+                    <i class="fas fa-microphone"></i>
+                </div>
             </div>
         </div>
-        <div id="userList"></div>
+        <div id="userList" class="user-list"></div>
     </div>
     <div id="settingsModal" class="modal">
         <div class="modal-content">
             <h2>Settings</h2>
             <div class="form-group">
-                <label for="updateUserName">Update Your Name:</label>
-                <input type="text" id="updateUserName">
+                <label for="updateUserName">Your Name:</label>
+                <input type="text" id="updateUserName" placeholder="Enter your name">
             </div>
-            <button id="updateNameBtn">Update</button>
-            <button id="closeModal">Close</button>
+            <button id="updateNameBtn" class="btn-primary">Update</button>
+            <button id="closeModal" class="btn-secondary">Close</button>
         </div>
     </div>
+    <button id="settingsBtn" class="btn-icon" aria-label="Settings"><i class="fas fa-cog"></i></button>
     <script src="/socket.io/socket.io.js"></script>
-    <script src="client.js"></script>
+    <script src="/client.js"></script>
 </body>
 </html>

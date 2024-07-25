@@ -2,6 +2,7 @@ let socket;
 let localStream;
 let peerConnections = {};
 let userName = localStorage.getItem('userName') || '';
+let mySocketId = null;
 
 const joinRoomBtn = document.getElementById('joinRoom');
 const settingsBtn = document.getElementById('settingsBtn');
@@ -10,6 +11,8 @@ const updateNameBtn = document.getElementById('updateNameBtn');
 const closeModalBtn = document.getElementById('closeModal');
 const settingsModal = document.getElementById('settingsModal');
 const currentUserNameSpan = document.getElementById('currentUserName');
+const roomIdInput = document.getElementById('roomId');
+const userListContainer = document.getElementById('userList');
 
 if (joinRoomBtn) {
     joinRoomBtn.addEventListener('click', joinRoom);
@@ -31,6 +34,12 @@ if (closeModalBtn) {
     closeModalBtn.addEventListener('click', closeSettings);
 }
 
+if (roomIdInput) {
+    roomIdInput.addEventListener('input', function(e) {
+        this.value = this.value.replace(/[^0-9]/g, '').slice(0, 4);
+    });
+}
+
 function updateCurrentUserName() {
     if (currentUserNameSpan) {
         currentUserNameSpan.textContent = userName || 'Guest';
@@ -39,8 +48,14 @@ function updateCurrentUserName() {
 
 function initializePage() {
     updateCurrentUserName();
-    if (window.location.pathname === '/room.html') {
-        initializeRoom();
+    if (window.location.pathname.startsWith('/rooms/')) {
+        const roomId = window.location.pathname.split('/').pop();
+        if (/^\d{4}$/.test(roomId)) {
+            initializeRoom(roomId);
+        } else {
+            alert('Invalid room ID. Please use a 4-digit number.');
+            window.location.href = '/';
+        }
     }
 }
 
@@ -54,15 +69,15 @@ function closeSettings() {
 }
 
 window.onclick = function(event) {
-    if (event.target == settingsModal && window.innerWidth > 768) {
+    if (event.target == settingsModal) {
         closeSettings();
     }
 }
 
 function joinRoom() {
-    const roomId = document.getElementById('roomId').value;
+    const roomId = roomIdInput.value;
 
-    if (roomId.length !== 4 || !/^\d+$/.test(roomId)) {
+    if (roomId.length !== 4) {
         alert('Please enter a valid 4-digit room code.');
         return;
     }
@@ -73,20 +88,25 @@ function joinRoom() {
         return;
     }
 
-    window.location.href = `/room.html?roomId=${roomId}`;
+    window.location.href = `/rooms/${roomId}`;
 }
 
-async function initializeRoom() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const roomId = urlParams.get('roomId');
+async function initializeRoom(roomId) {
+    if (!userName) {
+        alert('Please set your name before joining a room.');
+        openSettings();
+        return;
+    }
 
     document.getElementById('roomDisplay').textContent = roomId;
+    showLoadingAnimation();
 
     try {
         localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         socket = io();
 
         socket.on('connect', () => {
+            mySocketId = socket.id;
             socket.emit('join-room', { roomId, userName });
         });
 
@@ -102,13 +122,28 @@ async function initializeRoom() {
     } catch (error) {
         console.error('Error accessing microphone:', error);
         alert('Unable to access the microphone. Please check your settings and try again.');
+        hideLoadingAnimation();
+    }
+}
+
+function showLoadingAnimation() {
+    if (userListContainer) {
+        userListContainer.innerHTML = '<div class="loading-animation"></div>';
+    }
+}
+
+function hideLoadingAnimation() {
+    if (userListContainer) {
+        userListContainer.innerHTML = '';
     }
 }
 
 function handleUserConnected(user) {
     console.log('User connected:', user);
-    createPeerConnection(user.id);
-    callUser(user.id);
+    if (user.id !== mySocketId) {
+        createPeerConnection(user.id);
+        callUser(user.id);
+    }
 }
 
 function handleUserDisconnected(userId) {
@@ -120,13 +155,17 @@ function handleUserDisconnected(userId) {
 }
 
 function updateUserList(users) {
-    const userList = document.getElementById('userList');
-    userList.innerHTML = '';
+    hideLoadingAnimation();
+    if (!userListContainer) return;
+
+    userListContainer.innerHTML = '';
     users.forEach(user => {
-        const userItem = document.createElement('div');
-        userItem.className = 'user-item';
-        userItem.textContent = user.name;
-        userList.appendChild(userItem);
+        if (user.id !== mySocketId) {
+            const userItem = document.createElement('div');
+            userItem.className = 'user-item';
+            userItem.textContent = user.name;
+            userListContainer.appendChild(userItem);
+        }
     });
 }
 
@@ -197,7 +236,7 @@ function toggleMicrophone() {
 }
 
 function updateUserName() {
-    const newName = document.getElementById('updateUserName').value;
+    const newName = document.getElementById('updateUserName').value.trim();
     if (newName && newName !== userName) {
         userName = newName;
         localStorage.setItem('userName', userName);
@@ -206,6 +245,8 @@ function updateUserName() {
             socket.emit('update-user-name', newName);
         }
         closeSettings();
+    } else {
+        alert('Please enter a valid name.');
     }
 }
 
