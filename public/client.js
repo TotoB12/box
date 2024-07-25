@@ -164,14 +164,21 @@ function updateUserList(users) {
     if (!userListContainer) return;
 
     userListContainer.innerHTML = '';
-    users.forEach(user => {
-        if (user.id !== mySocketId) {
+    const otherUsers = users.filter(user => user.id !== mySocketId);
+
+    if (otherUsers.length === 0) {
+        const noUsersMessage = document.createElement('div');
+        noUsersMessage.className = 'no-users-message';
+        noUsersMessage.textContent = 'You sure seem lonely';
+        userListContainer.appendChild(noUsersMessage);
+    } else {
+        otherUsers.forEach(user => {
             const userItem = document.createElement('div');
             userItem.className = 'user-item';
             userItem.textContent = user.name;
             userListContainer.appendChild(userItem);
-        }
-    });
+        });
+    }
 }
 
 function createPeerConnection(userId) {

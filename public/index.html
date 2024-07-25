@@ -1,34 +1,56 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Box</title>
-    <link rel="stylesheet" href="styles.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
-</head>
-<body>
-    <div class="container">
-        <h1>Box <span class="subtitle">Audio Chat</span></h1>
-        <p class="user-info">Hello, <span id="currentUserName" class="user-name"></span>! <span class="settings-link" onclick="openSettings()">Change name</span></p>
-        <div class="form-group">
-            <label for="roomId">Room Code:</label>
-            <input type="text" id="roomId" placeholder="Enter 4-digit room code" maxlength="4" pattern="\d{4}">
-        </div>
-        <button id="joinRoom" class="btn-primary">Join Room</button>
-    </div>
-    <div id="settingsModal" class="modal">
-        <div class="modal-content">
-            <h2>Settings</h2>
-            <div class="form-group">
-                <label for="updateUserName">Your Name:</label>
-                <input type="text" id="updateUserName" placeholder="Enter your name">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Box</title>
+        <link rel="stylesheet" href="styles.css" />
+        <link
+            rel="stylesheet"
+            href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css"
+        />
+    </head>
+    <body>
+        <div class="container">
+            <div class="top-row home-top-row">
+                <button id="settingsBtn" class="btn-icon" aria-label="Settings">
+                    <i class="fas fa-cog"></i>
+                </button>
             </div>
-            <button id="updateNameBtn" class="btn-primary">Update</button>
-            <button id="closeModal" class="btn-secondary">Close</button>
+            <h1>Box <span class="subtitle">Audio Chat</span></h1>
+            <p class="user-info">
+                Hello, <span id="currentUserName" class="user-name"></span>!
+                <span class="settings-link" onclick="openSettings()"
+                    >Change name</span
+                >
+            </p>
+            <div class="form-group">
+                <label for="roomId">Room Code:</label>
+                <input
+                    type="text"
+                    id="roomId"
+                    placeholder="Enter 4-digit room code"
+                    maxlength="4"
+                    pattern="\d{4}"
+                />
+            </div>
+            <button id="joinRoom" class="btn-primary">Join Room</button>
         </div>
-    </div>
-    <button id="settingsBtn" class="btn-icon" aria-label="Settings"><i class="fas fa-cog"></i></button>
-    <script src="client.js"></script>
-</body>
+        <div id="settingsModal" class="modal">
+            <div class="modal-content">
+                <h2>Settings</h2>
+                <div class="form-group">
+                    <label for="updateUserName">Your Name:</label>
+                    <input
+                        type="text"
+                        id="updateUserName"
+                        placeholder="Enter your name"
+                    />
+                </div>
+                <button id="updateNameBtn" class="btn-primary">Update</button>
+                <button id="closeModal" class="btn-secondary">Close</button>
+            </div>
+        </div>
+        <script src="client.js"></script>
+    </body>
 </html>
