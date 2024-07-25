@@ -49,6 +49,14 @@ body {
   margin: 0 auto;
 }
 
+h1, .page-title {
+  font-family: 'Poly Sans Bulky', 'Roboto', 'Arial', sans-serif;
+}
+
+.subtitle, .user-info, .label, .settings-link, .user-item {
+  font-family: 'Poly Sans Slim', 'Roboto', 'Arial', sans-serif;
+}
+
 h1 {
   text-align: center;
   color: var(--primary-color);
@@ -99,6 +107,7 @@ input[type="text"]:focus {
   font-weight: 500;
   text-transform: uppercase;
   transition: background-color 0.3s ease, transform 0.1s ease;
+  font-family: 'Poly Sans', 'Roboto', 'Arial', sans-serif;
 }
 
 .btn-primary {
