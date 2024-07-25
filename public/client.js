@@ -3,6 +3,8 @@ let localStream;
 let peerConnections = {};
 let userName = localStorage.getItem('userName') || '';
 let mySocketId = null;
+let stopwatchInterval;
+let connectedTime;
 
 const joinRoomBtn = document.getElementById('joinRoom');
 const settingsBtn = document.getElementById('settingsBtn');
@@ -13,6 +15,7 @@ const settingsModal = document.getElementById('settingsModal');
 const currentUserNameSpan = document.getElementById('currentUserName');
 const roomIdInput = document.getElementById('roomId');
 const userListContainer = document.getElementById('userList');
+const stopwatchElement = document.getElementById('stopwatch');
 
 if (joinRoomBtn) {
     joinRoomBtn.addEventListener('click', joinRoom);
@@ -99,6 +102,7 @@ async function initializeRoom(roomId) {
     }
 
     document.getElementById('roomDisplay').textContent = roomId;
+    document.title = `Box - ${roomId}`; // Set the room page title
     showLoadingAnimation();
 
     try {
@@ -108,6 +112,7 @@ async function initializeRoom(roomId) {
         socket.on('connect', () => {
             mySocketId = socket.id;
             socket.emit('join-room', { roomId, userName });
+            startStopwatch();
         });
 
         socket.on('user-connected', handleUserConnected);
@@ -251,3 +256,17 @@ function updateUserName() {
 }
 
 document.addEventListener('DOMContentLoaded', initializePage);
+
+function startStopwatch() {
+    connectedTime = new Date();
+    stopwatchInterval = setInterval(updateStopwatch, 1000);
+}
+
+function updateStopwatch() {
+    const now = new Date();
+    const elapsedTime = Math.floor((now - connectedTime) / 1000);
+    const hours = String(Math.floor(elapsedTime / 3600)).padStart(2, '0');
+    const minutes = String(Math.floor((elapsedTime % 3600) / 60)).padStart(2, '0');
+    const seconds = String(elapsedTime % 60).padStart(2, '0');
+    stopwatchElement.textContent = `${hours}:${minutes}:${seconds}`;
+}

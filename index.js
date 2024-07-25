@@ -11,7 +11,6 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.static(path.join(__dirname, "public")));
 
-// Serve room.html for /rooms/:roomId
 app.get('/rooms/:roomId', (req, res) => {
   const roomId = req.params.roomId;
   if (/^\d{4}$/.test(roomId)) {
@@ -21,7 +20,6 @@ app.get('/rooms/:roomId', (req, res) => {
   }
 });
 
-// Redirect all other routes to the home page
 app.get('*', (req, res) => {
   res.redirect('/');
 });
