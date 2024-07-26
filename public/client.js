@@ -3,6 +3,7 @@ let localStream;
 let peerConnections = {};
 let peerPingTimes = {};
 let pingIntervals = {};
+const cleanupFunctions = {};
 let userName = localStorage.getItem("userName") || "";
 let mySocketId = null;
 let stopwatchInterval;
@@ -138,7 +139,16 @@ async function initializeRoom(roomId) {
 
 function showLoadingAnimation() {
     if (userListContainer) {
-        userListContainer.innerHTML = '<div class="loading-animation"></div>';
+        userListContainer.innerHTML = `
+            <div class="hexagon-loader">
+                <div class="dot"></div>
+                <div class="dot"></div>
+                <div class="dot"></div>
+                <div class="dot"></div>
+                <div class="dot"></div>
+                <div class="dot"></div>
+            </div>
+        `;
     }
 }
 
@@ -166,6 +176,11 @@ function handleUserDisconnected(userId) {
         clearInterval(pingIntervals[userId]);
         delete pingIntervals[userId];
     }
+    if (cleanupFunctions[userId]) {
+        cleanupFunctions[userId]();
+        delete cleanupFunctions[userId];
+    }
+    hideTalkingIndicator(userId);
 }
 
 function updateUserList(users) {
@@ -181,6 +196,13 @@ function updateUserList(users) {
         noUsersMessage.textContent = "You sure seem lonely";
         userListContainer.appendChild(noUsersMessage);
     } else {
+        const userIds = new Set(users.map((user) => user.id));
+        Object.keys(peerConnections).forEach((userId) => {
+            if (!userIds.has(userId)) {
+                handleUserDisconnected(userId);
+            }
+        });
+
         otherUsers.forEach((user) => {
             const userItem = document.createElement("div");
             userItem.className = "user-item";
@@ -190,8 +212,15 @@ function updateUserList(users) {
             userName.textContent = user.name;
 
             const muteIcon = document.createElement("i");
-            muteIcon.className = user.muted ? "fas fa-microphone-slash mic-off" : "fas fa-microphone mic-on";
-            muteIcon.style.marginLeft = "10px";
+            muteIcon.className = user.muted
+                ? "fas mic-icon fa-microphone-slash mic-off"
+                : "fas mic-icon fa-microphone mic-on";
+            muteIcon.style.fontSize = "15px";
+
+            const leftContainer = document.createElement("div");
+            leftContainer.className = "left-container";
+            leftContainer.appendChild(muteIcon);
+            leftContainer.appendChild(userName);
 
             const networkSpeed = document.createElement("div");
             networkSpeed.className = "network-speed";
@@ -201,12 +230,17 @@ function updateUserList(users) {
                 networkSpeed.appendChild(bar);
             }
 
-            userItem.appendChild(muteIcon);
-            userItem.appendChild(userName);
-            userItem.appendChild(networkSpeed);
+            const rightContainer = document.createElement("div");
+            rightContainer.className = "right-container";
+            rightContainer.appendChild(networkSpeed);
+
+            userItem.appendChild(leftContainer);
+            userItem.appendChild(rightContainer);
             userListContainer.appendChild(userItem);
 
             updateNetworkSpeedIndicator(user.id, peerPingTimes[user.id] || 300);
+
+            hideTalkingIndicator(user.id);
         });
     }
 }
@@ -229,6 +263,7 @@ function createPeerConnection(userId) {
         const audio = new Audio();
         audio.srcObject = event.streams[0];
         audio.play();
+        cleanupFunctions[userId] = detectTalking(userId, event.streams[0]);
     };
 
     localStream.getTracks().forEach((track) => {
@@ -240,6 +275,69 @@ function createPeerConnection(userId) {
     pingIntervals[userId] = measurePingTime(userId);
 
     return peerConnection;
+}
+
+function detectTalking(userId, stream) {
+    const audioContext = new (window.AudioContext ||
+        window.webkitAudioContext)();
+    const analyser = audioContext.createAnalyser();
+    const microphone = audioContext.createMediaStreamSource(stream);
+    const javascriptNode = audioContext.createScriptProcessor(2048, 1, 1);
+
+    analyser.smoothingTimeConstant = 0.8;
+    analyser.fftSize = 1024;
+
+    microphone.connect(analyser);
+    analyser.connect(javascriptNode);
+    javascriptNode.connect(audioContext.destination);
+
+    const checkTalking = () => {
+        const array = new Uint8Array(analyser.frequencyBinCount);
+        analyser.getByteFrequencyData(array);
+        const average = array.reduce((a, b) => a + b) / array.length;
+
+        const talkingThreshold = 10;
+        if (average > talkingThreshold) {
+            showTalkingIndicator(userId);
+        } else {
+            hideTalkingIndicator(userId);
+        }
+    };
+
+    javascriptNode.onaudioprocess = checkTalking;
+
+    return () => {
+        javascriptNode.disconnect();
+        microphone.disconnect();
+        analyser.disconnect();
+        audioContext.close();
+    };
+}
+
+function showTalkingIndicator(userId) {
+    const userItem = document.querySelector(
+        `.user-item[data-user-id="${userId}"]`,
+    );
+    if (userItem) {
+        const talkingIndicator = userItem.querySelector(".talking-indicator");
+        if (!talkingIndicator) {
+            const icon = document.createElement("i");
+            icon.className = "fas fa-volume-up talking-indicator";
+            userItem.querySelector(".left-container").appendChild(icon);
+        }
+    }
+}
+
+function hideTalkingIndicator(userId) {
+    const userItem = document.querySelector(
+        `.user-item[data-user-id="${userId}"]`,
+    );
+    if (userItem) {
+        const talkingIndicator = userItem.querySelector(".talking-indicator");
+        if (talkingIndicator) {
+            talkingIndicator.remove();
+        }
+    }
 }
 
 function measurePingTime(userId) {
