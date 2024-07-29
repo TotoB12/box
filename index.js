@@ -1,3 +1,4 @@
+// Add in index.js
 const express = require("express");
 const http = require("http");
 const socketIo = require("socket.io");
@@ -11,17 +12,17 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.static(path.join(__dirname, "public")));
 
-app.get('/room/:roomId', (req, res) => {
+app.get("/room/:roomId", (req, res) => {
   const roomId = req.params.roomId;
   if (/^\d{4}$/.test(roomId)) {
-    res.sendFile(path.join(__dirname, 'public', 'room.html'));
+    res.sendFile(path.join(__dirname, "public", "room.html"));
   } else {
-    res.status(404).send('Invalid room ID. Please use a 4-digit number.');
+    res.status(404).send("Invalid room ID. Please use a 4-digit number.");
   }
 });
 
-app.get('*', (req, res) => {
-  res.redirect('/');
+app.get("*", (req, res) => {
+  res.redirect("/");
 });
 
 const rooms = new Map();
@@ -41,10 +42,25 @@ io.on("connection", (socket) => {
     if (!rooms.has(roomId)) {
       rooms.set(roomId, new Map());
     }
-    rooms.get(roomId).set(socket.id, { id: socket.id, name: userName, muted: false });
+    rooms
+      .get(roomId)
+      .set(socket.id, {
+        id: socket.id,
+        name: userName,
+        muted: false,
+        videoOff: true,
+      });
 
-    io.to(roomId).emit("user-connected", { id: socket.id, name: userName, muted: false });
-    io.to(roomId).emit("update-user-list", Array.from(rooms.get(roomId).values()));
+    io.to(roomId).emit("user-connected", {
+      id: socket.id,
+      name: userName,
+      muted: false,
+      videoOff: true,
+    });
+    io.to(roomId).emit(
+      "update-user-list",
+      Array.from(rooms.get(roomId).values()),
+    );
 
     socket.on("disconnect", () => {
       console.log("A user disconnected");
@@ -57,7 +73,10 @@ io.on("connection", (socket) => {
         if (user) {
           user.name = newName;
           currentUserName = newName;
-          io.to(currentRoom).emit("update-user-list", Array.from(rooms.get(currentRoom).values()));
+          io.to(currentRoom).emit(
+            "update-user-list",
+            Array.from(rooms.get(currentRoom).values()),
+          );
         }
       }
     });
@@ -67,7 +86,23 @@ io.on("connection", (socket) => {
         const user = rooms.get(currentRoom).get(socket.id);
         if (user) {
           user.muted = muted;
-          io.to(currentRoom).emit("update-user-list", Array.from(rooms.get(currentRoom).values()));
+          io.to(currentRoom).emit(
+            "update-user-list",
+            Array.from(rooms.get(currentRoom).values()),
+          );
+        }
+      }
+    });
+
+    socket.on("video-status", (videoOff) => {
+      if (currentRoom && rooms.has(currentRoom)) {
+        const user = rooms.get(currentRoom).get(socket.id);
+        if (user) {
+          user.videoOff = videoOff;
+          io.to(currentRoom).emit(
+            "update-user-list",
+            Array.from(rooms.get(currentRoom).values()),
+          );
         }
       }
     });
@@ -80,7 +115,10 @@ io.on("connection", (socket) => {
         rooms.delete(currentRoom);
       } else {
         io.to(currentRoom).emit("user-disconnected", socket.id);
-        io.to(currentRoom).emit("update-user-list", Array.from(rooms.get(currentRoom).values()));
+        io.to(currentRoom).emit(
+          "update-user-list",
+          Array.from(rooms.get(currentRoom).values()),
+        );
       }
     }
   }

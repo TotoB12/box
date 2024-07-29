@@ -1,5 +1,6 @@
 let socket;
 let localStream;
+let localVideoStream;
 let peerConnections = {};
 let peerPingTimes = {};
 let pingIntervals = {};
@@ -12,6 +13,7 @@ let connectedTime;
 const joinRoomBtn = document.getElementById("joinRoom");
 const settingsBtn = document.getElementById("settingsBtn");
 const micSwitch = document.getElementById("micSwitch");
+const videoSwitch = document.getElementById("videoSwitch");
 const updateNameBtn = document.getElementById("updateNameBtn");
 const closeModalBtn = document.getElementById("closeModal");
 const settingsModal = document.getElementById("settingsModal");
@@ -30,6 +32,10 @@ if (settingsBtn) {
 
 if (micSwitch) {
     micSwitch.addEventListener("change", toggleMicrophone);
+}
+
+if (videoSwitch) {
+    videoSwitch.addEventListener("change", toggleVideo);
 }
 
 if (updateNameBtn) {
@@ -112,6 +118,9 @@ async function initializeRoom(roomId) {
         localStream = await navigator.mediaDevices.getUserMedia({
             audio: true,
         });
+        localVideoStream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+        });
         socket = io();
 
         socket.on("connect", () => {
@@ -128,10 +137,11 @@ async function initializeRoom(roomId) {
         socket.on("ice-candidate", handleNewICECandidateMsg);
 
         toggleMicrophone();
+        toggleVideo();
     } catch (error) {
-        console.error("Error accessing microphone:", error);
+        console.error("Error accessing media devices:", error);
         alert(
-            "Unable to access the microphone. Please check your settings and try again.",
+            "Unable to access the microphone or camera. Please check your settings and try again.",
         );
         hideLoadingAnimation();
     }
@@ -187,16 +197,18 @@ function updateUserList(users) {
     hideLoadingAnimation();
     if (!userListContainer) return;
 
-    const currentUserIds = new Set(Array.from(userListContainer.children).map(el => el.dataset.userId));
-    const newUserIds = new Set(users.map(user => user.id));
+    const currentUserIds = new Set(
+        Array.from(userListContainer.children).map((el) => el.dataset.userId),
+    );
+    const newUserIds = new Set(users.map((user) => user.id));
 
-    currentUserIds.forEach(userId => {
+    currentUserIds.forEach((userId) => {
         if (!newUserIds.has(userId)) {
             removeUser(userId);
         }
     });
 
-    users.forEach(user => {
+    users.forEach((user) => {
         if (user.id !== mySocketId) {
             if (currentUserIds.has(user.id)) {
                 updateUser(user);
@@ -210,20 +222,24 @@ function updateUserList(users) {
 }
 
 function addUser(user) {
-    const userItem = document.createElement('div');
-    userItem.className = 'user-item';
+    const userItem = document.createElement("div");
+    userItem.className = "user-item";
     userItem.dataset.userId = user.id;
 
     userItem.innerHTML = `
-        <div class="left-container">
-            <i class="fas mic-icon fa-microphone${user.muted ? '-slash mic-off' : ' mic-on'}"></i>
-            <span class="user-list-name">${user.name}</span>
-        </div>
-        <div class="right-container">
-            <div class="network-speed">
-                <div class="network-bar"></div>
-                <div class="network-bar"></div>
-                <div class="network-bar"></div>
+        <div class="video-container" id="video-${user.id}"></div>
+        <div class="status-bar">
+            <div class="left-container">
+                <i class="fas mic-icon fa-microphone${user.muted ? "-slash mic-off" : " mic-on"}"></i>
+                <i class="fas video-icon fa-video${user.videoOff ? "-slash video-off" : " video-on"}"></i>
+                <span class="user-list-name">${user.name}</span>
+            </div>
+            <div class="right-container">
+                <div class="network-speed">
+                    <div class="network-bar"></div>
+                    <div class="network-bar"></div>
+                    <div class="network-bar"></div>
+                </div>
             </div>
         </div>
     `;
@@ -233,27 +249,40 @@ function addUser(user) {
 }
 
 function updateUser(user) {
-    const userItem = document.querySelector(`.user-item[data-user-id="${user.id}"]`);
+    const userItem = document.querySelector(
+        `.user-item[data-user-id="${user.id}"]`,
+    );
     if (userItem) {
-        const nameElement = userItem.querySelector('.user-name');
-        const micIcon = userItem.querySelector('.mic-icon');
+        const nameElement = userItem.querySelector(".user-name");
+        const micIcon = userItem.querySelector(".mic-icon");
+        const videoIcon = userItem.querySelector(".video-icon");
 
         if (nameElement.textContent !== user.name) {
             nameElement.textContent = user.name;
         }
 
-        const isMuted = micIcon.classList.contains('fa-microphone-slash');
+        const isMuted = micIcon.classList.contains("fa-microphone-slash");
         if (isMuted !== user.muted) {
-            micIcon.classList.toggle('fa-microphone-slash', user.muted);
-            micIcon.classList.toggle('fa-microphone', !user.muted);
-            micIcon.classList.toggle('mic-off', user.muted);
-            micIcon.classList.toggle('mic-on', !user.muted);
+            micIcon.classList.toggle("fa-microphone-slash", user.muted);
+            micIcon.classList.toggle("fa-microphone", !user.muted);
+            micIcon.classList.toggle("mic-off", user.muted);
+            micIcon.classList.toggle("mic-on", !user.muted);
+        }
+
+        const isVideoOff = videoIcon.classList.contains("fa-video-slash");
+        if (isVideoOff !== user.videoOff) {
+            videoIcon.classList.toggle("fa-video-slash", user.videoOff);
+            videoIcon.classList.toggle("fa-video", !user.videoOff);
+            videoIcon.classList.toggle("video-off", user.videoOff);
+            videoIcon.classList.toggle("video-on", !user.videoOff);
         }
     }
 }
 
 function removeUser(userId) {
-    const userItem = document.querySelector(`.user-item[data-user-id="${userId}"]`);
+    const userItem = document.querySelector(
+        `.user-item[data-user-id="${userId}"]`,
+    );
     if (userItem) {
         userItem.remove();
     }
@@ -261,13 +290,13 @@ function removeUser(userId) {
 }
 
 function updateEmptyRoomMessage() {
-    const noUsersMessage = userListContainer.querySelector('.no-users-message');
-    const hasUsers = userListContainer.querySelector('.user-item');
+    const noUsersMessage = userListContainer.querySelector(".no-users-message");
+    const hasUsers = userListContainer.querySelector(".user-item");
 
     if (!hasUsers && !noUsersMessage) {
-        const message = document.createElement('div');
-        message.className = 'no-users-message';
-        message.textContent = 'You sure seem lonely';
+        const message = document.createElement("div");
+        message.className = "no-users-message";
+        message.textContent = "You sure seem lonely";
         userListContainer.appendChild(message);
     } else if (hasUsers && noUsersMessage) {
         noUsersMessage.remove();
@@ -289,14 +318,30 @@ function createPeerConnection(userId) {
     };
 
     peerConnection.ontrack = (event) => {
-        const audio = new Audio();
-        audio.srcObject = event.streams[0];
-        audio.play();
-        cleanupFunctions[userId] = detectTalking(userId, event.streams[0]);
+        if (event.track.kind === "audio") {
+            const audio = new Audio();
+            audio.srcObject = event.streams[0];
+            audio.play();
+            cleanupFunctions[userId] = detectTalking(userId, event.streams[0]);
+        } else if (event.track.kind === "video") {
+            const videoContainer = document.getElementById(`video-${userId}`);
+            if (videoContainer) {
+                const videoElement = document.createElement("video");
+                videoElement.srcObject = event.streams[0];
+                videoElement.autoplay = true;
+                videoElement.playsInline = true;
+                videoContainer.innerHTML = "";
+                videoContainer.appendChild(videoElement);
+            }
+        }
     };
 
     localStream.getTracks().forEach((track) => {
         peerConnection.addTrack(track, localStream);
+    });
+
+    localVideoStream.getTracks().forEach((track) => {
+        peerConnection.addTrack(track, localVideoStream);
     });
 
     peerConnections[userId] = peerConnection;
@@ -344,18 +389,22 @@ function detectTalking(userId, stream) {
 }
 
 function showTalkingIndicator(userId) {
-    const userItem = document.querySelector(`.user-item[data-user-id="${userId}"]`);
-    if (userItem && !userItem.querySelector('.talking-indicator')) {
-        const icon = document.createElement('i');
-        icon.className = 'fas fa-volume-up talking-indicator';
-        userItem.querySelector('.left-container').appendChild(icon);
+    const userItem = document.querySelector(
+        `.user-item[data-user-id="${userId}"]`,
+    );
+    if (userItem && !userItem.querySelector(".talking-indicator")) {
+        const icon = document.createElement("i");
+        icon.className = "fas fa-volume-up talking-indicator";
+        userItem.querySelector(".left-container").appendChild(icon);
     }
 }
 
 function hideTalkingIndicator(userId) {
-    const userItem = document.querySelector(`.user-item[data-user-id="${userId}"]`);
+    const userItem = document.querySelector(
+        `.user-item[data-user-id="${userId}"]`,
+    );
     if (userItem) {
-        const talkingIndicator = userItem.querySelector('.talking-indicator');
+        const talkingIndicator = userItem.querySelector(".talking-indicator");
         if (talkingIndicator) {
             talkingIndicator.remove();
         }
@@ -389,14 +438,21 @@ function measurePingTime(userId) {
 }
 
 function updateNetworkSpeedIndicator(userId, pingTime) {
-    const userItem = document.querySelector(`.user-item[data-user-id="${userId}"]`);
+    const userItem = document.querySelector(
+        `.user-item[data-user-id="${userId}"]`,
+    );
     if (userItem) {
-        const bars = userItem.querySelectorAll('.network-bar');
+        const bars = userItem.querySelectorAll(".network-bar");
         const activeBarCount = pingTime < 100 ? 3 : pingTime < 300 ? 2 : 1;
-        const barClass = pingTime < 100 ? 'active' : pingTime < 300 ? 'active medium' : 'active slow';
+        const barClass =
+            pingTime < 100
+                ? "active"
+                : pingTime < 300
+                  ? "active medium"
+                  : "active slow";
 
         bars.forEach((bar, index) => {
-            bar.className = `network-bar ${index < activeBarCount ? barClass : ''}`;
+            bar.className = `network-bar ${index < activeBarCount ? barClass : ""}`;
         });
     }
 }
@@ -446,6 +502,16 @@ function toggleMicrophone() {
     }
 }
 
+function toggleVideo() {
+    if (localVideoStream) {
+        const videoTrack = localVideoStream.getVideoTracks()[0];
+        videoTrack.enabled = videoSwitch.checked;
+        if (socket) {
+            socket.emit("video-status", !videoTrack.enabled);
+        }
+    }
+}
+
 function updateMicIcon(isOn) {
     const micIcon = document.querySelector(".mic-icon");
     if (isOn) {
@@ -457,6 +523,17 @@ function updateMicIcon(isOn) {
     }
 }
 
+function updateVideoIcon(isOn) {
+    const videoIcon = document.querySelector(".video-icon");
+    if (isOn) {
+        videoIcon.classList.remove("fa-video-slash", "video-off");
+        videoIcon.classList.add("fa-video", "video-on");
+    } else {
+        videoIcon.classList.remove("fa-video", "video-on");
+        videoIcon.classList.add("fa-video-slash", "video-off");
+    }
+}
+
 if (micSwitch) {
     micSwitch.addEventListener("change", function () {
         toggleMicrophone();
@@ -464,8 +541,19 @@ if (micSwitch) {
     });
 }
 
+if (videoSwitch) {
+    videoSwitch.addEventListener("change", function () {
+        toggleVideo();
+        updateVideoIcon(this.checked);
+    });
+}
+
 if (micSwitch) {
     updateMicIcon(micSwitch.checked);
+}
+
+if (videoSwitch) {
+    updateVideoIcon(videoSwitch.checked);
 }
 
 function updateUserName() {
