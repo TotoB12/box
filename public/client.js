@@ -4,6 +4,7 @@ let localVideoStream;
 let peerConnections = {};
 let peerPingTimes = {};
 let pingIntervals = {};
+let userVideoStreams = {};
 const cleanupFunctions = {};
 let userName = localStorage.getItem("userName") || "";
 let mySocketId = null;
@@ -190,6 +191,9 @@ function handleUserDisconnected(userId) {
         cleanupFunctions[userId]();
         delete cleanupFunctions[userId];
     }
+    if (userVideoStreams[userId]) {
+        delete userVideoStreams[userId];
+    }
     hideTalkingIndicator(userId);
 }
 
@@ -246,6 +250,10 @@ function addUser(user) {
 
     userListContainer.appendChild(userItem);
     updateNetworkSpeedIndicator(user.id, peerPingTimes[user.id] || 300);
+
+    if (userVideoStreams[user.id]) {
+        attachVideoStream(user.id, userVideoStreams[user.id]);
+    }
 }
 
 function updateUser(user) {
@@ -253,7 +261,7 @@ function updateUser(user) {
         `.user-item[data-user-id="${user.id}"]`,
     );
     if (userItem) {
-        const nameElement = userItem.querySelector(".user-name");
+        const nameElement = userItem.querySelector(".user-list-name");
         const micIcon = userItem.querySelector(".mic-icon");
         const videoIcon = userItem.querySelector(".video-icon");
 
@@ -275,6 +283,10 @@ function updateUser(user) {
             videoIcon.classList.toggle("fa-video", !user.videoOff);
             videoIcon.classList.toggle("video-off", user.videoOff);
             videoIcon.classList.toggle("video-on", !user.videoOff);
+        }
+
+        if (userVideoStreams[user.id]) {
+            attachVideoStream(user.id, userVideoStreams[user.id]);
         }
     }
 }
@@ -324,15 +336,8 @@ function createPeerConnection(userId) {
             audio.play();
             cleanupFunctions[userId] = detectTalking(userId, event.streams[0]);
         } else if (event.track.kind === "video") {
-            const videoContainer = document.getElementById(`video-${userId}`);
-            if (videoContainer) {
-                const videoElement = document.createElement("video");
-                videoElement.srcObject = event.streams[0];
-                videoElement.autoplay = true;
-                videoElement.playsInline = true;
-                videoContainer.innerHTML = "";
-                videoContainer.appendChild(videoElement);
-            }
+            userVideoStreams[userId] = event.streams[0];
+            attachVideoStream(userId, event.streams[0]);
         }
     };
 
@@ -349,6 +354,20 @@ function createPeerConnection(userId) {
     pingIntervals[userId] = measurePingTime(userId);
 
     return peerConnection;
+}
+
+function attachVideoStream(userId, stream) {
+    const videoContainer = document.getElementById(`video-${userId}`);
+    if (videoContainer) {
+        let videoElement = videoContainer.querySelector("video");
+        if (!videoElement) {
+            videoElement = document.createElement("video");
+            videoElement.autoplay = true;
+            videoElement.playsInline = true;
+            videoContainer.appendChild(videoElement);
+        }
+        videoElement.srcObject = stream;
+    }
 }
 
 function detectTalking(userId, stream) {
