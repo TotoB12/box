@@ -11,7 +11,7 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.static(path.join(__dirname, "public")));
 
-app.get('/rooms/:roomId', (req, res) => {
+app.get('/room/:roomId', (req, res) => {
   const roomId = req.params.roomId;
   if (/^\d{4}$/.test(roomId)) {
     res.sendFile(path.join(__dirname, 'public', 'room.html'));

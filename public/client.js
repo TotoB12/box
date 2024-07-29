@@ -54,7 +54,7 @@ function updateCurrentUserName() {
 
 function initializePage() {
     updateCurrentUserName();
-    if (window.location.pathname.startsWith("/rooms/")) {
+    if (window.location.pathname.startsWith("/room/")) {
         const roomId = window.location.pathname.split("/").pop();
         if (/^\d{4}$/.test(roomId)) {
             initializeRoom(roomId);
@@ -94,7 +94,7 @@ function joinRoom() {
         return;
     }
 
-    window.location.href = `/rooms/${roomId}`;
+    window.location.href = `/room/${roomId}`;
 }
 
 async function initializeRoom(roomId) {
@@ -187,61 +187,92 @@ function updateUserList(users) {
     hideLoadingAnimation();
     if (!userListContainer) return;
 
-    userListContainer.innerHTML = "";
-    const otherUsers = users.filter((user) => user.id !== mySocketId);
+    const currentUserIds = new Set(Array.from(userListContainer.children).map(el => el.dataset.userId));
+    const newUserIds = new Set(users.map(user => user.id));
 
-    if (otherUsers.length === 0) {
-        const noUsersMessage = document.createElement("div");
-        noUsersMessage.className = "no-users-message";
-        noUsersMessage.textContent = "You sure seem lonely";
-        userListContainer.appendChild(noUsersMessage);
-    } else {
-        const userIds = new Set(users.map((user) => user.id));
-        Object.keys(peerConnections).forEach((userId) => {
-            if (!userIds.has(userId)) {
-                handleUserDisconnected(userId);
+    // Remove disconnected users
+    currentUserIds.forEach(userId => {
+        if (!newUserIds.has(userId)) {
+            removeUser(userId);
+        }
+    });
+
+    // Add new users and update existing ones
+    users.forEach(user => {
+        if (user.id !== mySocketId) {
+            if (currentUserIds.has(user.id)) {
+                updateUser(user);
+            } else {
+                addUser(user);
             }
-        });
+        }
+    });
 
-        otherUsers.forEach((user) => {
-            const userItem = document.createElement("div");
-            userItem.className = "user-item";
-            userItem.dataset.userId = user.id;
+    updateEmptyRoomMessage();
+}
 
-            const userName = document.createElement("span");
-            userName.textContent = user.name;
+function addUser(user) {
+    const userItem = document.createElement('div');
+    userItem.className = 'user-item';
+    userItem.dataset.userId = user.id;
 
-            const muteIcon = document.createElement("i");
-            muteIcon.className = user.muted
-                ? "fas mic-icon fa-microphone-slash mic-off"
-                : "fas mic-icon fa-microphone mic-on";
-            muteIcon.style.fontSize = "15px";
+    userItem.innerHTML = `
+        <div class="left-container">
+            <i class="fas mic-icon fa-microphone${user.muted ? '-slash mic-off' : ' mic-on'}"></i>
+            <span class="user-list-name">${user.name}</span>
+        </div>
+        <div class="right-container">
+            <div class="network-speed">
+                <div class="network-bar"></div>
+                <div class="network-bar"></div>
+                <div class="network-bar"></div>
+            </div>
+        </div>
+    `;
 
-            const leftContainer = document.createElement("div");
-            leftContainer.className = "left-container";
-            leftContainer.appendChild(muteIcon);
-            leftContainer.appendChild(userName);
+    userListContainer.appendChild(userItem);
+    updateNetworkSpeedIndicator(user.id, peerPingTimes[user.id] || 300);
+}
 
-            const networkSpeed = document.createElement("div");
-            networkSpeed.className = "network-speed";
-            for (let i = 0; i < 3; i++) {
-                const bar = document.createElement("div");
-                bar.className = "network-bar";
-                networkSpeed.appendChild(bar);
-            }
+function updateUser(user) {
+    const userItem = document.querySelector(`.user-item[data-user-id="${user.id}"]`);
+    if (userItem) {
+        const nameElement = userItem.querySelector('.user-name');
+        const micIcon = userItem.querySelector('.mic-icon');
 
-            const rightContainer = document.createElement("div");
-            rightContainer.className = "right-container";
-            rightContainer.appendChild(networkSpeed);
+        if (nameElement.textContent !== user.name) {
+            nameElement.textContent = user.name;
+        }
 
-            userItem.appendChild(leftContainer);
-            userItem.appendChild(rightContainer);
-            userListContainer.appendChild(userItem);
+        const isMuted = micIcon.classList.contains('fa-microphone-slash');
+        if (isMuted !== user.muted) {
+            micIcon.classList.toggle('fa-microphone-slash', user.muted);
+            micIcon.classList.toggle('fa-microphone', !user.muted);
+            micIcon.classList.toggle('mic-off', user.muted);
+            micIcon.classList.toggle('mic-on', !user.muted);
+        }
+    }
+}
 
-            updateNetworkSpeedIndicator(user.id, peerPingTimes[user.id] || 300);
+function removeUser(userId) {
+    const userItem = document.querySelector(`.user-item[data-user-id="${userId}"]`);
+    if (userItem) {
+        userItem.remove();
+    }
+    handleUserDisconnected(userId);
+}
 
-            hideTalkingIndicator(user.id);
-        });
+function updateEmptyRoomMessage() {
+    const noUsersMessage = userListContainer.querySelector('.no-users-message');
+    const hasUsers = userListContainer.querySelector('.user-item');
+
+    if (!hasUsers && !noUsersMessage) {
+        const message = document.createElement('div');
+        message.className = 'no-users-message';
+        message.textContent = 'You sure seem lonely';
+        userListContainer.appendChild(message);
+    } else if (hasUsers && noUsersMessage) {
+        noUsersMessage.remove();
     }
 }
 
@@ -315,25 +346,18 @@ function detectTalking(userId, stream) {
 }
 
 function showTalkingIndicator(userId) {
-    const userItem = document.querySelector(
-        `.user-item[data-user-id="${userId}"]`,
-    );
-    if (userItem) {
-        const talkingIndicator = userItem.querySelector(".talking-indicator");
-        if (!talkingIndicator) {
-            const icon = document.createElement("i");
-            icon.className = "fas fa-volume-up talking-indicator";
-            userItem.querySelector(".left-container").appendChild(icon);
-        }
+    const userItem = document.querySelector(`.user-item[data-user-id="${userId}"]`);
+    if (userItem && !userItem.querySelector('.talking-indicator')) {
+        const icon = document.createElement('i');
+        icon.className = 'fas fa-volume-up talking-indicator';
+        userItem.querySelector('.left-container').appendChild(icon);
     }
 }
 
 function hideTalkingIndicator(userId) {
-    const userItem = document.querySelector(
-        `.user-item[data-user-id="${userId}"]`,
-    );
+    const userItem = document.querySelector(`.user-item[data-user-id="${userId}"]`);
     if (userItem) {
-        const talkingIndicator = userItem.querySelector(".talking-indicator");
+        const talkingIndicator = userItem.querySelector('.talking-indicator');
         if (talkingIndicator) {
             talkingIndicator.remove();
         }
@@ -367,23 +391,14 @@ function measurePingTime(userId) {
 }
 
 function updateNetworkSpeedIndicator(userId, pingTime) {
-    console.log(pingTime);
-    const userItem = document.querySelector(
-        `.user-item[data-user-id="${userId}"]`,
-    );
+    const userItem = document.querySelector(`.user-item[data-user-id="${userId}"]`);
     if (userItem) {
-        const networkSpeed = userItem.querySelector(".network-speed");
-        const bars = networkSpeed.querySelectorAll(".network-bar");
+        const bars = userItem.querySelectorAll('.network-bar');
+        const activeBarCount = pingTime < 100 ? 3 : pingTime < 300 ? 2 : 1;
+        const barClass = pingTime < 100 ? 'active' : pingTime < 300 ? 'active medium' : 'active slow';
 
         bars.forEach((bar, index) => {
-            bar.classList.remove("active", "slow", "medium");
-            if (pingTime < 100 && index < 3) {
-                bar.classList.add("active");
-            } else if (pingTime < 300 && index < 2) {
-                bar.classList.add("active", "medium");
-            } else if (pingTime >= 300 && index < 1) {
-                bar.classList.add("active", "slow");
-            }
+            bar.className = `network-bar ${index < activeBarCount ? barClass : ''}`;
         });
     }
 }
@@ -470,8 +485,6 @@ function updateUserName() {
     }
 }
 
-document.addEventListener("DOMContentLoaded", initializePage);
-
 function startStopwatch() {
     connectedTime = new Date();
     stopwatchInterval = setInterval(updateStopwatch, 1000);
@@ -488,3 +501,5 @@ function updateStopwatch() {
     const seconds = String(elapsedTime % 60).padStart(2, "0");
     stopwatchElement.textContent = `${hours}:${minutes}:${seconds}`;
 }
+
+document.addEventListener("DOMContentLoaded", initializePage);

@@ -235,6 +235,12 @@ input[type="text"]:focus {
   align-items: center;
 }
 
+.user-info {
+  text-align: center;
+  margin-bottom: 2rem;
+  color: var(--text-secondary);
+}
+
 .left-container {
   display: flex;
   align-items: center;
@@ -348,6 +354,10 @@ input[type="text"]:focus {
   margin-right: 0.2em;
 }
 
+.user-list-name {
+  
+}
+
 .settings-link {
   color: var(--secondary-color);
   text-decoration: underline;
@@ -424,12 +434,6 @@ input[type="text"]:focus {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 2rem;
-}
-
-.user-info {
-  text-align: center;
-  margin-bottom: 2rem;
-  color: var(--text-secondary);
 }
 
 .stopwatch {
