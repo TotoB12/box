@@ -50,10 +50,6 @@ body {
   margin: 0 auto;
 }
 
-.room-container {
-  max-width: 100%;
-}
-
 h1, .page-title {
   font-family: 'Poly Sans Bulky', 'Roboto', 'Arial', sans-serif;
 }
@@ -218,17 +214,31 @@ input[type="text"]:focus {
   box-shadow: 0 6px 8px rgba(187, 134, 252, 0.4);
 }
 
-.user-controls {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+.user-info {
+  text-align: left;
   margin-bottom: 1rem;
+  color: var(--text-secondary);
+}
+
+.user-controls {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: var(--surface-color);
+  padding: 10px 20px;
+  border-radius: 25px;
+  box-shadow: 0px 0px 2px black;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  z-index: 1000;
 }
 
 .user-list {
   margin-top: 1rem;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 1rem;
 }
 
@@ -243,15 +253,9 @@ input[type="text"]:focus {
   position: relative;
 }
 
-.user-info {
-  text-align: center;
-  margin-bottom: 2rem;
-  color: var(--text-secondary);
-}
-
 .video-container {
   width: 100%;
-  height: 150px;
+  height: 500px;
   background-color: var(--text-secondary);
   display: flex;
   justify-content: center;
@@ -411,7 +415,6 @@ input[type="text"]:focus {
 .toggle-wrapper {
   display: flex;
   align-items: center;
-  margin-left: 0.3em;
 }
 
 .toggle-input {
@@ -422,7 +425,7 @@ input[type="text"]:focus {
   display: inline-block;
   width: 60px;
   height: 34px;
-  background-color: var(--surface-color);
+  background-color: var(--bg-color);
   border-radius: 17px;
   position: relative;
   cursor: pointer;
@@ -465,6 +468,10 @@ input[type="text"]:focus {
   transition: color 0.3s ease;
 }
 
+.room-container {
+  max-width: 100%;
+}
+
 .top-row {
   display: flex;
   justify-content: space-between;
@@ -474,19 +481,26 @@ input[type="text"]:focus {
 }
 
 .room-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 2rem;
+  margin-bottom: 1rem;
+  text-align: left;
+}
+
+.room-header h1 {
+  text-align: left;
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
 }
 
 .stopwatch {
-  font-size: 1rem;
-  color: var(--text-secondary);
-  margin-left: 0.5rem;
-  width: 80px;
-  text-align: center;
+    color: var(--text-secondary);
 }
+
+/* .mic-icon, .video-icon {
+    font-size: 1.2rem;
+    width: 30px;
+    text-align: center;
+    transition: color 0.3s ease;
+} */
 
 .hexagon-loader {
     position: relative;
@@ -568,12 +582,13 @@ input[type="text"]:focus {
   }
 
   .room-header {
-      flex-direction: column;
-      align-items: flex-start;
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .user-controls {
-      margin-top: 1rem;
+      padding: 10px;
+      gap: 10px;
   }
 
   .stopwatch {

@@ -525,6 +525,7 @@ function toggleVideo() {
     if (localVideoStream) {
         const videoTrack = localVideoStream.getVideoTracks()[0];
         videoTrack.enabled = videoSwitch.checked;
+        updateVideoIcon(videoTrack.enabled);
         if (socket) {
             socket.emit("video-status", !videoTrack.enabled);
         }
@@ -532,24 +533,28 @@ function toggleVideo() {
 }
 
 function updateMicIcon(isOn) {
-    const micIcon = document.querySelector(".mic-icon");
-    if (isOn) {
-        micIcon.classList.remove("fa-microphone-slash", "mic-off");
-        micIcon.classList.add("fa-microphone", "mic-on");
-    } else {
-        micIcon.classList.remove("fa-microphone", "mic-on");
-        micIcon.classList.add("fa-microphone-slash", "mic-off");
+    const micIcon = document.querySelector("#micToggle .mic-icon");
+    if (micIcon) {
+        if (isOn) {
+            micIcon.classList.remove("fa-microphone-slash", "mic-off");
+            micIcon.classList.add("fa-microphone", "mic-on");
+        } else {
+            micIcon.classList.remove("fa-microphone", "mic-on");
+            micIcon.classList.add("fa-microphone-slash", "mic-off");
+        }
     }
 }
 
 function updateVideoIcon(isOn) {
-    const videoIcon = document.querySelector(".video-icon");
-    if (isOn) {
-        videoIcon.classList.remove("fa-video-slash", "video-off");
-        videoIcon.classList.add("fa-video", "video-on");
-    } else {
-        videoIcon.classList.remove("fa-video", "video-on");
-        videoIcon.classList.add("fa-video-slash", "video-off");
+    const videoIcon = document.querySelector("#videoToggle .video-icon");
+    if (videoIcon) {
+        if (isOn) {
+            videoIcon.classList.remove("fa-video-slash", "video-off");
+            videoIcon.classList.add("fa-video", "video-on");
+        } else {
+            videoIcon.classList.remove("fa-video", "video-on");
+            videoIcon.classList.add("fa-video-slash", "video-off");
+        }
     }
 }
 
