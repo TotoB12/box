@@ -42,14 +42,12 @@ io.on("connection", (socket) => {
     if (!rooms.has(roomId)) {
       rooms.set(roomId, new Map());
     }
-    rooms
-      .get(roomId)
-      .set(socket.id, {
-        id: socket.id,
-        name: userName,
-        muted: false,
-        videoOff: true,
-      });
+    rooms.get(roomId).set(socket.id, {
+      id: socket.id,
+      name: userName,
+      muted: false,
+      videoOff: true,
+    });
 
     io.to(roomId).emit("user-connected", {
       id: socket.id,
