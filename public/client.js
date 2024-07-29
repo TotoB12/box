@@ -190,14 +190,12 @@ function updateUserList(users) {
     const currentUserIds = new Set(Array.from(userListContainer.children).map(el => el.dataset.userId));
     const newUserIds = new Set(users.map(user => user.id));
 
-    // Remove disconnected users
     currentUserIds.forEach(userId => {
         if (!newUserIds.has(userId)) {
             removeUser(userId);
         }
     });
 
-    // Add new users and update existing ones
     users.forEach(user => {
         if (user.id !== mySocketId) {
             if (currentUserIds.has(user.id)) {
