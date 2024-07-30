@@ -494,6 +494,15 @@ input[type="text"]:focus {
   transition: color 0.3s ease;
 }
 
+#flipCameraBtn {
+  display: none;
+  margin-left: 0.5rem;
+}
+
+#flipCameraBtn.visible {
+  display: inline-block;
+}
+
 .room-container {
     max-width: 100%;
     height: calc(100vh - 100px); /* Adjust based on top bar height */

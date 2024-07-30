@@ -10,11 +10,16 @@ let userName = localStorage.getItem("userName") || "Guest";
 let mySocketId = null;
 let stopwatchInterval;
 let connectedTime;
+let availableCameras = [];
+let frontCamera;
+let backCamera;
+let currentCameraIndex = 0;
 
 const joinRoomBtn = document.getElementById("joinRoom");
 const settingsBtn = document.getElementById("settingsBtn");
 const micSwitch = document.getElementById("micSwitch");
 const videoSwitch = document.getElementById("videoSwitch");
+const flipCameraBtn = document.getElementById("flipCameraBtn");
 const updateNameBtn = document.getElementById("updateNameBtn");
 const closeModalBtn = document.getElementById("closeModal");
 const settingsModal = document.getElementById("settingsModal");
@@ -45,6 +50,10 @@ if (videoSwitch) {
         updateVideoIcon(this.checked);
         toggleLocalVideoPreview(this.checked);
     });
+}
+
+if (flipCameraBtn) {
+    flipCameraBtn.addEventListener("click", flipCamera);
 }
 
 if (updateNameBtn) {
@@ -151,9 +160,7 @@ async function initializeRoom(roomId) {
         localStream = await navigator.mediaDevices.getUserMedia({
             audio: true,
         });
-        localVideoStream = await navigator.mediaDevices.getUserMedia({
-            video: true,
-        });
+        await initializeVideoDevices();
         socket = io();
 
         socket.on("connect", () => {
@@ -186,6 +193,88 @@ async function initializeRoom(roomId) {
             "Unable to access the microphone or camera. Please check your settings and try again.",
         );
         hideLoadingAnimation();
+    }
+}
+
+async function initializeVideoDevices() {
+    try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        availableCameras = devices.filter(device => device.kind === 'videoinput');
+
+        frontCamera = availableCameras.find(device => device.label.toLowerCase().includes('front'));
+        backCamera = availableCameras.find(device => device.label.toLowerCase().includes('back'));
+
+        if (frontCamera && backCamera) {
+            console.log('Front and back cameras identified');
+        } else {
+            console.log('Unable to identify front and back cameras, will cycle through all cameras');
+        }
+
+        if (availableCameras.length > 0) {
+            localVideoStream = await navigator.mediaDevices.getUserMedia({
+                video: { deviceId: availableCameras[0].deviceId }
+            });
+        } else {
+            console.warn('No video input devices found');
+            localVideoStream = new MediaStream();
+        }
+
+        updateFlipCameraButtonVisibility();
+    } catch (error) {
+        console.error('Error initializing video devices:', error);
+        localVideoStream = new MediaStream();
+    }
+}
+
+function updateFlipCameraButtonVisibility() {
+    if (flipCameraBtn) {
+        if (availableCameras.length > 1 && videoSwitch.checked) {
+            flipCameraBtn.classList.add('visible');
+        } else {
+            flipCameraBtn.classList.remove('visible');
+        }
+    }
+}
+
+async function flipCamera() {
+    if (availableCameras.length < 2) return;
+
+    if (frontCamera && backCamera) {
+        // On mobile, just switch between front and back
+        currentCameraIndex = (currentCameraIndex === availableCameras.indexOf(frontCamera)) 
+            ? availableCameras.indexOf(backCamera) 
+            : availableCameras.indexOf(frontCamera);
+    } else {
+        // On desktop or when front/back can't be identified, cycle through all cameras
+        currentCameraIndex = (currentCameraIndex + 1) % availableCameras.length;
+    }
+
+    const newCameraId = availableCameras[currentCameraIndex].deviceId;
+
+    try {
+        const newVideoStream = await navigator.mediaDevices.getUserMedia({
+            video: { deviceId: newCameraId }
+        });
+
+        localVideoStream.getVideoTracks().forEach(track => track.stop());
+
+        const [newVideoTrack] = newVideoStream.getVideoTracks();
+        localVideoStream.removeTrack(localVideoStream.getVideoTracks()[0]);
+        localVideoStream.addTrack(newVideoTrack);
+
+        toggleLocalVideoPreview(videoSwitch.checked);
+
+        Object.values(peerConnections).forEach(pc => {
+            const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
+            if (sender) {
+                sender.replaceTrack(newVideoTrack);
+            }
+        });
+
+        socket.emit('camera-changed');
+    } catch (error) {
+        console.error('Error flipping camera:', error);
+        alert('Failed to switch camera. Please try again.');
     }
 }
 
@@ -581,10 +670,13 @@ function toggleMicrophone() {
 function toggleVideo() {
     if (localVideoStream) {
         const videoTrack = localVideoStream.getVideoTracks()[0];
-        videoTrack.enabled = videoSwitch.checked;
-        updateVideoIcon(videoTrack.enabled);
-        if (socket) {
-            socket.emit("video-status", !videoTrack.enabled);
+        if (videoTrack) {
+            videoTrack.enabled = videoSwitch.checked;
+            updateVideoIcon(videoTrack.enabled);
+            updateFlipCameraButtonVisibility();
+            if (socket) {
+                socket.emit("video-status", !videoTrack.enabled);
+            }
         }
     }
 }
