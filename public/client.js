@@ -118,7 +118,8 @@ async function initializeRoom(roomId) {
     try {
         localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         localVideoStream = await navigator.mediaDevices.getUserMedia({ video: true });
-        socket = io();
+        await fetch('/api/signaling')
+        socket = io()
 
         socket.on('connect', () => {
             mySocketId = socket.id;
