@@ -22,10 +22,15 @@
                 </button>
             </div>
             <div class="room-header">
-                <h1>Room: <span id="roomDisplay"></span></h1>
-                <div class="user-info">
-                    <span id="currentUserName" class="user-name"></span>
-                    <span id="stopwatch" class="stopwatch">00:00:00</span>
+                <div class="room-info">
+                    <h1>Room: <span id="roomDisplay"></span></h1>
+                    <div class="user-info">
+                        <span id="currentUserName" class="user-name"></span>
+                        <span id="stopwatch" class="stopwatch">00:00:00</span>
+                    </div>
+                </div>
+                <div class="video-preview-container">
+                    <video id="localVideoPreview" autoplay muted playsinline></video>
                 </div>
             </div>
             <div id="userList" class="user-list"></div>

@@ -534,20 +534,42 @@ select:focus {
 }
 
 .room-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1rem;
+  margin-bottom: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.room-info {
+  flex: 1;
+}
+
+.video-preview-container {
+  width: 120px;
+  height: 90px;
+  overflow: hidden;
+  border-radius: 8px;
+  background-color: var(--surface-color);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+#localVideoPreview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 @media (max-width: 767px) {
     .room-header {
         flex-direction: column;
-        align-items: flex-start;
+        align-items: stretch;
     }
 
-    .room-header .user-info {
-        margin-top: 0.5rem;
+    .video-preview-container {
+        margin-top: 1rem;
+        align-self: flex-end;
     }
 }
 
