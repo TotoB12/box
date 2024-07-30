@@ -2,7 +2,12 @@ import { Server } from 'socket.io'
 
 const ioHandler = (req, res) => {
   if (!res.socket.server.io) {
-    const io = new Server(res.socket.server)
+    console.log('*First use, starting socket.io')
+
+    const io = new Server(res.socket.server, {
+      path: '/api/socketio',
+      addTrailingSlash: false,
+    })
 
     io.on('connection', (socket) => {
       console.log('A user connected')
@@ -41,15 +46,17 @@ const ioHandler = (req, res) => {
       })
     })
 
-    res.socket.server.io = io
-  }
-  res.end()
-}
+        res.socket.server.io = io
+      } else {
+        console.log('socket.io already running')
+      }
+      res.end()
+    }
 
-export const config = {
-  api: {
-    bodyParser: false
-  }
-}
+    export const config = {
+      api: {
+        bodyParser: false,
+      },
+    }
 
-export default ioHandler
+    export default ioHandler
