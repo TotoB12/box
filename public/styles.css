@@ -528,7 +528,7 @@ input[type="text"]:focus {
   border-radius: 8px;
   display: flex;
   justify-content: flex-end;
-  align-items: flex-start;
+  align-items: center;
 }
 
 #localVideoPreview {

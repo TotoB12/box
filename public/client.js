@@ -1,5 +1,3 @@
-// client.js
-
 let socket;
 let localStream;
 let localVideoStream;
