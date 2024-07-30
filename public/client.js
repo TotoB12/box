@@ -12,8 +12,6 @@ let userName = localStorage.getItem("userName") || "Guest";
 let mySocketId = null;
 let stopwatchInterval;
 let connectedTime;
-let cameraDevices = [];
-let selectedCameraId = localStorage.getItem("selectedCameraId") || "";
 
 const joinRoomBtn = document.getElementById("joinRoom");
 const settingsBtn = document.getElementById("settingsBtn");
@@ -27,7 +25,6 @@ const roomIdInput = document.getElementById("roomId");
 const updateUserNameInput = document.getElementById("updateUserName");
 const userListContainer = document.getElementById("userList");
 const stopwatchElement = document.getElementById("stopwatch");
-const cameraSelect = document.getElementById("cameraSelect");
 
 if (joinRoomBtn) {
     joinRoomBtn.addEventListener("click", joinRoom);
@@ -63,16 +60,6 @@ if (closeModalBtn) {
 if (roomIdInput) {
     roomIdInput.addEventListener("input", function (e) {
         this.value = this.value.replace(/[^0-9]/g, "").slice(0, 4);
-    });
-}
-
-if (cameraSelect) {
-    cameraSelect.addEventListener("change", function () {
-        selectedCameraId = this.value;
-        localStorage.setItem("selectedCameraId", selectedCameraId);
-        if (localVideoStream) {
-            updateCamera();
-        }
     });
 }
 
@@ -201,63 +188,6 @@ async function initializeRoom(roomId) {
             "Unable to access the microphone or camera. Please check your settings and try again.",
         );
         hideLoadingAnimation();
-    }
-}
-
-async function getCameraDevices() {
-    try {
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        cameraDevices = devices.filter(
-            (device) => device.kind === "videoinput",
-        );
-        updateCameraSelect();
-    } catch (error) {
-        console.error("Error getting camera devices:", error);
-    }
-}
-
-function updateCameraSelect() {
-    if (cameraSelect) {
-        cameraSelect.innerHTML = "";
-        cameraDevices.forEach((device) => {
-            const option = document.createElement("option");
-            option.value = device.deviceId;
-            option.text = device.label || `Camera ${cameraSelect.length + 1}`;
-            cameraSelect.appendChild(option);
-        });
-        cameraSelect.value = selectedCameraId;
-    }
-}
-
-async function updateCamera() {
-    if (localVideoStream) {
-        const videoTrack = localVideoStream.getVideoTracks()[0];
-        if (videoTrack) {
-            videoTrack.stop();
-        }
-        try {
-            const newVideoStream = await navigator.mediaDevices.getUserMedia({
-                video: { deviceId: { exact: selectedCameraId } },
-            });
-            const newVideoTrack = newVideoStream.getVideoTracks()[0];
-            localVideoStream = new MediaStream([newVideoTrack]);
-
-            for (const connection of Object.values(peerConnections)) {
-                const sender = connection
-                    .getSenders()
-                    .find((s) => s.track && s.track.kind === "video");
-                if (sender) {
-                    sender.replaceTrack(newVideoTrack);
-                }
-            }
-
-            const localVideo = document.getElementById("localVideoPreview");
-            if (localVideo) {
-                localVideo.srcObject = localVideoStream;
-            }
-        } catch (error) {
-            console.error("Error switching camera:", error);
-        }
     }
 }
 
@@ -585,6 +515,7 @@ function measurePingTime(userId) {
 }
 
 function updateNetworkSpeedIndicator(userId, pingTime) {
+    console.log(pingTime);
     const userItem = document.querySelector(
         `.user-item[data-user-id="${userId}"]`,
     );
@@ -747,7 +678,4 @@ function updateStopwatch() {
     stopwatchElement.textContent = `${hours}:${minutes}:${seconds}`;
 }
 
-document.addEventListener("DOMContentLoaded", async function () {
-    await getCameraDevices();
-    initializePage();
-});
+document.addEventListener("DOMContentLoaded", initializePage);
