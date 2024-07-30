@@ -106,44 +106,46 @@ function joinRoom() {
 
 async function initializeRoom(roomId) {
     if (!userName) {
-        alert("Please set your name before joining a room.");
+        alert('Please set your name before joining a room.');
         openSettings();
         return;
     }
 
-    document.getElementById("roomDisplay").textContent = roomId;
+    document.getElementById('roomDisplay').textContent = roomId;
     document.title = `Box - ${roomId}`;
     showLoadingAnimation();
 
     try {
-        localStream = await navigator.mediaDevices.getUserMedia({
-            audio: true,
-        });
-        localVideoStream = await navigator.mediaDevices.getUserMedia({
-            video: true,
-        });
+        localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        localVideoStream = await navigator.mediaDevices.getUserMedia({ video: true });
         socket = io();
 
-        socket.on("connect", () => {
+        socket.on('connect', () => {
             mySocketId = socket.id;
-            socket.emit("join-room", { roomId, userName });
+            socket.emit('join-room', { roomId, userName });
             startStopwatch();
         });
 
-        socket.on("user-connected", handleUserConnected);
-        socket.on("user-disconnected", handleUserDisconnected);
-        socket.on("update-user-list", updateUserList);
-        socket.on("offer", handleOffer);
-        socket.on("answer", handleAnswer);
-        socket.on("ice-candidate", handleNewICECandidateMsg);
+        socket.on('user-connected', handleUserConnected);
+        socket.on('user-disconnected', handleUserDisconnected);
+        socket.on('update-user-list', updateUserList);
+        socket.on('offer', handleOffer);
+        socket.on('answer', handleAnswer);
+        socket.on('ice-candidate', handleNewICECandidateMsg);
 
         toggleMicrophone();
         toggleVideo();
+
+        const controlsContainer = document.createElement('div');
+        controlsContainer.className = 'room-controls';
+        controlsContainer.appendChild(document.querySelector('.user-controls'));
+        document.body.appendChild(controlsContainer);
+
+        const roomContainer = document.querySelector('.room-container');
+        roomContainer.style.paddingBottom = '80px';
     } catch (error) {
-        console.error("Error accessing media devices:", error);
-        alert(
-            "Unable to access the microphone or camera. Please check your settings and try again.",
-        );
+        console.error('Error accessing media devices:', error);
+        alert('Unable to access the microphone or camera. Please check your settings and try again.');
         hideLoadingAnimation();
     }
 }
@@ -201,18 +203,16 @@ function updateUserList(users) {
     hideLoadingAnimation();
     if (!userListContainer) return;
 
-    const currentUserIds = new Set(
-        Array.from(userListContainer.children).map((el) => el.dataset.userId),
-    );
-    const newUserIds = new Set(users.map((user) => user.id));
+    const currentUserIds = new Set(Array.from(userListContainer.children).map(el => el.dataset.userId));
+    const newUserIds = new Set(users.map(user => user.id));
 
-    currentUserIds.forEach((userId) => {
+    currentUserIds.forEach(userId => {
         if (!newUserIds.has(userId)) {
             removeUser(userId);
         }
     });
 
-    users.forEach((user) => {
+    users.forEach(user => {
         if (user.id !== mySocketId) {
             if (currentUserIds.has(user.id)) {
                 updateUser(user);
@@ -222,20 +222,35 @@ function updateUserList(users) {
         }
     });
 
+    updateUserListLayout(users.length - 1);
     updateEmptyRoomMessage();
 }
 
+function updateUserListLayout(userCount) {
+    if (!userListContainer) return;
+
+    userListContainer.className = 'user-list';
+
+    if (userCount === 0) {
+        userListContainer.classList.add('empty-room');
+    } else if (userCount === 1) {
+        userListContainer.classList.add('single-user');
+    } else if (userCount === 2) {
+        userListContainer.classList.add('two-users');
+    }
+}
+
 function addUser(user) {
-    const userItem = document.createElement("div");
-    userItem.className = "user-item";
+    const userItem = document.createElement('div');
+    userItem.className = 'user-item';
     userItem.dataset.userId = user.id;
 
     userItem.innerHTML = `
         <div class="video-container" id="video-${user.id}"></div>
         <div class="status-bar">
             <div class="left-container">
-                <i class="fas mic-icon fa-microphone${user.muted ? "-slash mic-off" : " mic-on"}"></i>
-                <i class="fas video-icon fa-video${user.videoOff ? "-slash video-off" : " video-on"}"></i>
+                <i class="fas mic-icon fa-microphone${user.muted ? '-slash mic-off' : ' mic-on'}"></i>
+                <i class="fas video-icon fa-video${user.videoOff ? '-slash video-off' : ' video-on'}"></i>
                 <span class="user-list-name">${user.name}</span>
             </div>
             <div class="right-container">
@@ -308,7 +323,7 @@ function updateEmptyRoomMessage() {
     if (!hasUsers && !noUsersMessage) {
         const message = document.createElement("div");
         message.className = "no-users-message";
-        message.textContent = "You sure seem lonely";
+        message.textContent = "You sure seem lonely...";
         userListContainer.appendChild(message);
     } else if (hasUsers && noUsersMessage) {
         noUsersMessage.remove();
