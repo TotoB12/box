@@ -1,85 +1,86 @@
+<!-- room.html -->
 <!doctype html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Box</title>
-        <link rel="stylesheet" href="/styles.css" />
-        <link
-            rel="stylesheet"
-            href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css"
-        />
-    </head>
-    <body>
-        <div class="container room-container">
-            <div class="top-row room-top-row">
-                <a href="/" class="back-arrow"
-                    ><i class="fas fa-arrow-left"></i
-                ></a>
-                <div class="page-title">Box</div>
-                <button id="settingsBtn" class="btn-icon" aria-label="Settings">
-                    <i class="fas fa-cog"></i>
-                </button>
-            </div>
-            <div class="room-header">
-                <div class="room-info">
-                    <h1>Room: <span id="roomDisplay"></span></h1>
-                    <div class="user-info">
-                        <span id="currentUserName" class="user-name"></span>
-                        <span id="stopwatch" class="stopwatch">00:00:00</span>
-                    </div>
-                </div>
-                <div class="video-preview-container">
-                    <video id="localVideoPreview" autoplay muted playsinline></video>
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Box</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css"
+    />
+</head>
+<body>
+    <div class="container room-container">
+        <div class="top-row room-top-row">
+            <a href="/" class="back-arrow"
+                ><i class="fas fa-arrow-left"></i
+            ></a>
+            <div class="page-title">Box</div>
+            <button id="settingsBtn" class="btn-icon" aria-label="Settings">
+                <i class="fas fa-cog"></i>
+            </button>
+        </div>
+        <div class="room-header">
+            <div class="room-info">
+                <h1>Room: <span id="roomDisplay"></span></h1>
+                <div class="user-info">
+                    <span id="currentUserName" class="user-name"></span>
+                    <span id="stopwatch" class="stopwatch">00:00:00</span>
                 </div>
             </div>
-            <div id="userList" class="user-list"></div>
-            <div class="user-controls">
-                <div id="micToggle" class="toggle-wrapper">
-                    <input
-                        type="checkbox"
-                        id="micSwitch"
-                        class="toggle-input"
-                        checked
-                    />
-                    <label for="micSwitch" class="toggle-label">
-                        <span class="toggle-button"></span>
-                    </label>
-                    <i class="fas fa-microphone mic-icon mic-on"></i>
-                </div>
-                <div id="videoToggle" class="toggle-wrapper">
-                    <input
-                        type="checkbox"
-                        id="videoSwitch"
-                        class="toggle-input"
-                    />
-                    <label for="videoSwitch" class="toggle-label">
-                        <span class="toggle-button"></span>
-                    </label>
-                    <i class="fas fa-video video-icon video-off"></i>
-                </div>
+            <div class="video-preview-container">
+                <video id="localVideoPreview" autoplay muted playsinline></video>
             </div>
         </div>
-        <div id="settingsModal" class="modal">
-            <div class="modal-content">
-                <h2>Settings</h2>
-                <div class="form-group">
-                    <label for="updateUserName">Your Name:</label>
-                    <input
-                        type="text"
-                        id="updateUserName"
-                        placeholder="Enter your name"
-                    />
-                </div>
-                <div class="form-group">
-                    <label for="cameraSelect">Camera:</label>
-                    <select id="cameraSelect"></select>
-                </div>
-                <button id="updateNameBtn" class="btn-primary">Update</button>
-                <button id="closeModal" class="btn-secondary">Close</button>
+        <div id="userList" class="user-list"></div>
+        <div class="user-controls">
+            <div id="micToggle" class="toggle-wrapper">
+                <input
+                    type="checkbox"
+                    id="micSwitch"
+                    class="toggle-input"
+                    checked
+                />
+                <label for="micSwitch" class="toggle-label">
+                    <span class="toggle-button"></span>
+                </label>
+                <i class="fas fa-microphone mic-icon mic-on"></i>
+            </div>
+            <div id="videoToggle" class="toggle-wrapper">
+                <input
+                    type="checkbox"
+                    id="videoSwitch"
+                    class="toggle-input"
+                />
+                <label for="videoSwitch" class="toggle-label">
+                    <span class="toggle-button"></span>
+                </label>
+                <i class="fas fa-video video-icon video-off"></i>
             </div>
         </div>
-        <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-        <script src="/client.js"></script>
-    </body>
+    </div>
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
+            <h2>Settings</h2>
+            <div class="form-group">
+                <label for="updateUserName">Your Name:</label>
+                <input
+                    type="text"
+                    id="updateUserName"
+                    placeholder="Enter your name"
+                />
+            </div>
+            <div class="form-group">
+                <label for="cameraSelect">Camera:</label>
+                <select id="cameraSelect"></select>
+            </div>
+            <button id="updateNameBtn" class="btn-primary">Update</button>
+            <button id="closeModal" class="btn-secondary">Close</button>
+        </div>
+    </div>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="/client.js"></script>
+</body>
 </html>

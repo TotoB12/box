@@ -1,3 +1,5 @@
+// client.js
+
 let socket;
 let localStream;
 let localVideoStream;
@@ -46,6 +48,7 @@ if (videoSwitch) {
     videoSwitch.addEventListener("change", function () {
         toggleVideo();
         updateVideoIcon(this.checked);
+        toggleLocalVideoPreview(this.checked);
     });
 }
 
@@ -183,6 +186,7 @@ async function initializeRoom(roomId) {
 
         toggleMicrophone();
         toggleVideo();
+        toggleLocalVideoPreview(videoSwitch.checked);
 
         const controlsContainer = document.createElement("div");
         controlsContainer.className = "room-controls";
@@ -247,7 +251,7 @@ async function updateCamera() {
                 }
             }
 
-            const localVideo = document.getElementById("localVideo");
+            const localVideo = document.getElementById("localVideoPreview");
             if (localVideo) {
                 localVideo.srcObject = localVideoStream;
             }
@@ -678,6 +682,19 @@ function updateVideoIcon(isOn) {
         } else {
             videoIcon.classList.remove("fa-video", "video-on");
             videoIcon.classList.add("fa-video-slash", "video-off");
+        }
+    }
+}
+
+function toggleLocalVideoPreview(isOn) {
+    const localVideoPreview = document.getElementById("localVideoPreview");
+    if (localVideoPreview) {
+        if (isOn) {
+            localVideoPreview.srcObject = localVideoStream;
+            localVideoPreview.style.display = "block";
+        } else {
+            localVideoPreview.srcObject = null;
+            localVideoPreview.style.display = "none";
         }
     }
 }
