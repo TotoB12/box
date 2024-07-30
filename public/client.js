@@ -6,7 +6,8 @@ let peerPingTimes = {};
 let pingIntervals = {};
 let userVideoStreams = {};
 const cleanupFunctions = {};
-let userName = localStorage.getItem("userName") || "";
+let userName = localStorage.getItem("userName") || "Guest";
+let guestNumber = 1;
 let mySocketId = null;
 let stopwatchInterval;
 let connectedTime;
@@ -75,7 +76,7 @@ if (cameraSelect) {
 
 function updateCurrentUserName() {
     if (currentUserNameSpan) {
-        currentUserNameSpan.textContent = userName || "Guest";
+        currentUserNameSpan.textContent = userName;
     }
 }
 
@@ -141,19 +142,15 @@ function joinRoom() {
 }
 
 async function initializeRoom(roomId) {
-    if (!userName) {
+    if (userName === "Guest") {
+        alert("Please set your name in the settings before joining a room.");
         await new Promise((resolve) => {
-            alert("Please set your name before joining a room.");
             openSettings();
             const nameUpdateListener = function () {
-                if (userName) {
-                    updateNameBtn.removeEventListener(
-                        "click",
-                        nameUpdateListener,
-                    );
-                    closeSettings();
-                    resolve();
-                }
+                updateUserName();
+                updateNameBtn.removeEventListener("click", nameUpdateListener);
+                closeSettings();
+                resolve();
             };
             updateNameBtn.addEventListener("click", nameUpdateListener);
         });
@@ -164,16 +161,11 @@ async function initializeRoom(roomId) {
     showLoadingAnimation();
 
     try {
-        await getCameraDevices();
         localStream = await navigator.mediaDevices.getUserMedia({
             audio: true,
         });
         localVideoStream = await navigator.mediaDevices.getUserMedia({
-            video: {
-                deviceId: selectedCameraId
-                    ? { exact: selectedCameraId }
-                    : undefined,
-            },
+            video: true,
         });
         socket = io();
 
@@ -247,7 +239,6 @@ async function updateCamera() {
             const newVideoTrack = newVideoStream.getVideoTracks()[0];
             localVideoStream = new MediaStream([newVideoTrack]);
 
-            // Replace the video track in all peer connections
             for (const connection of Object.values(peerConnections)) {
                 const sender = connection
                     .getSenders()
@@ -257,7 +248,6 @@ async function updateCamera() {
                 }
             }
 
-            // Update local video preview if it exists
             const localVideo = document.getElementById("localVideo");
             if (localVideo) {
                 localVideo.srcObject = localVideoStream;
@@ -703,18 +693,24 @@ if (videoSwitch) {
 
 function updateUserName() {
     const newName = document.getElementById("updateUserName").value.trim();
-    if (newName) {
-        if (newName !== userName) {
-            userName = newName;
-            localStorage.setItem("userName", userName);
-            updateCurrentUserName();
-            if (socket) {
-                socket.emit("update-user-name", newName);
-            }
+    if (newName && newName !== userName) {
+        userName = newName;
+        localStorage.setItem("userName", userName);
+        updateCurrentUserName();
+        if (socket) {
+            socket.emit("update-user-name", newName);
+        }
+        closeSettings();
+    } else if (!newName) {
+        userName = `Guest ${guestNumber++}`;
+        localStorage.setItem("userName", userName);
+        updateCurrentUserName();
+        if (socket) {
+            socket.emit("update-user-name", userName);
         }
         closeSettings();
     } else {
-        alert("Please enter a valid name.");
+        closeSettings();
     }
 }
 
