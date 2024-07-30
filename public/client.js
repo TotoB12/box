@@ -20,6 +20,7 @@ const closeModalBtn = document.getElementById("closeModal");
 const settingsModal = document.getElementById("settingsModal");
 const currentUserNameSpan = document.getElementById("currentUserName");
 const roomIdInput = document.getElementById("roomId");
+const updateUserNameInput = document.getElementById("updateUserName");
 const userListContainer = document.getElementById("userList");
 const stopwatchElement = document.getElementById("stopwatch");
 
@@ -32,11 +33,17 @@ if (settingsBtn) {
 }
 
 if (micSwitch) {
-    micSwitch.addEventListener("change", toggleMicrophone);
+    micSwitch.addEventListener("change", function () {
+        toggleMicrophone();
+        updateMicIcon(this.checked);
+    });
 }
 
 if (videoSwitch) {
-    videoSwitch.addEventListener("change", toggleVideo);
+    videoSwitch.addEventListener("change", function () {
+        toggleVideo();
+        updateVideoIcon(this.checked);
+    });
 }
 
 if (updateNameBtn) {
@@ -70,7 +77,24 @@ function initializePage() {
             window.location.href = "/";
         }
     }
+
+    if (roomIdInput) {
+        roomIdInput.addEventListener("keydown", function (e) {
+            if (e.key === "Enter") {
+                joinRoom();
+            }
+        });
+    }
+
+    if (updateUserNameInput) {
+        updateUserNameInput.addEventListener("keydown", function (e) {
+            if (e.key === "Enter") {
+                updateUserName();
+            }
+        });
+    }
 }
+
 
 function openSettings() {
     settingsModal.style.display = "block";
@@ -106,9 +130,18 @@ function joinRoom() {
 
 async function initializeRoom(roomId) {
     if (!userName) {
-        alert('Please set your name before joining a room.');
-        openSettings();
-        return;
+        await new Promise((resolve) => {
+            alert('Please set your name before joining a room.');
+            openSettings();
+            const nameUpdateListener = function() {
+                if (userName) {
+                    updateNameBtn.removeEventListener('click', nameUpdateListener);
+                    closeSettings();
+                    resolve();
+                }
+            };
+            updateNameBtn.addEventListener('click', nameUpdateListener);
+        });
     }
 
     document.getElementById('roomDisplay').textContent = roomId;
@@ -571,20 +604,6 @@ function updateVideoIcon(isOn) {
             videoIcon.classList.add("fa-video-slash", "video-off");
         }
     }
-}
-
-if (micSwitch) {
-    micSwitch.addEventListener("change", function () {
-        toggleMicrophone();
-        updateMicIcon(this.checked);
-    });
-}
-
-if (videoSwitch) {
-    videoSwitch.addEventListener("change", function () {
-        toggleVideo();
-        updateVideoIcon(this.checked);
-    });
 }
 
 if (micSwitch) {
