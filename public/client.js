@@ -7,7 +7,6 @@ let pingIntervals = {};
 let userVideoStreams = {};
 const cleanupFunctions = {};
 let userName = localStorage.getItem("userName") || "Guest";
-let guestNumber = 1;
 let mySocketId = null;
 let stopwatchInterval;
 let connectedTime;
@@ -702,7 +701,7 @@ function updateUserName() {
         }
         closeSettings();
     } else if (!newName) {
-        userName = `Guest ${guestNumber++}`;
+        userName = `Guest`;
         localStorage.setItem("userName", userName);
         updateCurrentUserName();
         if (socket) {
