@@ -1,14 +1,13 @@
 const express = require("express");
 const http = require("http");
-const { Server } = require("socket.io");
+const socketIo = require("socket.io");
 const path = require("path");
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, {
-  path: "/api/socketio",
-  addTrailingSlash: false,
-});
+const io = socketIo(server);
+
+const PORT = process.env.PORT || 3000;
 
 app.use(express.static(path.join(__dirname, "public")));
 
@@ -24,6 +23,8 @@ app.get("/room/:roomId", (req, res) => {
 app.get("*", (req, res) => {
   res.redirect("/");
 });
+
+const rooms = new Map();
 
 io.on("connection", (socket) => {
   console.log("A user connected");
@@ -57,6 +58,11 @@ io.on("connection", (socket) => {
       "update-user-list",
       Array.from(rooms.get(roomId).values()),
     );
+
+    socket.on("disconnect", () => {
+      console.log("A user disconnected");
+      handleDisconnect();
+    });
 
     socket.on("update-user-name", (newName) => {
       if (currentRoom && rooms.has(currentRoom)) {
@@ -134,15 +140,8 @@ io.on("connection", (socket) => {
       sender: socket.id,
     });
   });
-
-  socket.on("disconnect", () => {
-    console.log("A user disconnected");
-  });
 });
 
-const port = process.env.PORT || 3000;
-server.listen(port, () => {
-  console.log(`Server running on port ${port}`);
+server.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
 });
-
-module.exports = app;

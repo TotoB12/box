@@ -118,23 +118,13 @@ async function initializeRoom(roomId) {
     try {
         localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         localVideoStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        socket = io();
 
-            socket = io({
-              path: '/api/socketio'
-            });
-
-            socket.on('connect', () => {
-              console.log('Connected to signaling server');
-              mySocketId = socket.id;
-              socket.emit('join-room', { roomId, userName });
-              startStopwatch();
-            });
-
-            socket.on('connect_error', (error) => {
-              console.error('Connection error:', error);
-              alert('Unable to connect to the signaling server. Please try again later.');
-              hideLoadingAnimation();
-            });
+        socket.on('connect', () => {
+            mySocketId = socket.id;
+            socket.emit('join-room', { roomId, userName });
+            startStopwatch();
+        });
 
         socket.on('user-connected', handleUserConnected);
         socket.on('user-disconnected', handleUserDisconnected);
@@ -143,22 +133,22 @@ async function initializeRoom(roomId) {
         socket.on('answer', handleAnswer);
         socket.on('ice-candidate', handleNewICECandidateMsg);
 
-            toggleMicrophone();
-            toggleVideo();
+        toggleMicrophone();
+        toggleVideo();
 
-            const controlsContainer = document.createElement('div');
-            controlsContainer.className = 'room-controls';
-            controlsContainer.appendChild(document.querySelector('.user-controls'));
-            document.body.appendChild(controlsContainer);
+        const controlsContainer = document.createElement('div');
+        controlsContainer.className = 'room-controls';
+        controlsContainer.appendChild(document.querySelector('.user-controls'));
+        document.body.appendChild(controlsContainer);
 
-            const roomContainer = document.querySelector('.room-container');
-            roomContainer.style.paddingBottom = '80px';
-          } catch (error) {
-            console.error('Error accessing media devices:', error);
-            alert('Unable to access the microphone or camera. Please check your settings and try again.');
-            hideLoadingAnimation();
-          }
-        }
+        const roomContainer = document.querySelector('.room-container');
+        roomContainer.style.paddingBottom = '80px';
+    } catch (error) {
+        console.error('Error accessing media devices:', error);
+        alert('Unable to access the microphone or camera. Please check your settings and try again.');
+        hideLoadingAnimation();
+    }
+}
 
 function showLoadingAnimation() {
     if (userListContainer) {
