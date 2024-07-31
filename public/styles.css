@@ -242,21 +242,34 @@ input[type="text"]:focus {
   gap: 1rem;
   height: 100%;
   width: 100%;
+  justify-content: center; /* Center items horizontally */
 }
 
 .user-item {
-  border-radius: 8px;
-  overflow: hidden;
-  position: relative;
   display: flex;
   flex-direction: column;
-  transition: flex-grow 0.3s ease, flex-basis 0.3s ease;
+  gap: 0.5rem;
+  max-width: 100%;
+  max-height: 70vh;
+  aspect-ratio: 16 / 9;
+  justify-self: center; /* Center each item within its grid cell */
+  width: 100%; /* Ensure the item takes full width of its cell */
+}
+
+.video-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 12px;
+  overflow: hidden;
 }
 
 .video-container video {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   display: none;
 }
 
@@ -265,19 +278,18 @@ input[type="text"]:focus {
 }
 
 .user-item .status-bar {
-  display: flex;
-  justify-content: space-between;
-  padding: 0.5rem;
   background-color: rgba(0, 0, 0, 0.5);
 }
 
 .status-bar {
-  padding: 0.5rem;
-  background-color: rgba(0, 0, 0, 0.5);
+  padding: 0.5rem 1rem;
+  background-color: var(--surface-color);
   color: var(--text-color);
   display: flex;
   justify-content: space-between;
   align-items: center;
+  border-radius: 12px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .left-container i {
@@ -292,21 +304,31 @@ input[type="text"]:focus {
 
 @media (min-width: 768px) {
   .user-list {
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
   }
 
-  .user-list.single-user {
-      grid-template-columns: 1fr;
+  .user-list.single-user .user-item {
+    max-height: calc(100vh - 200px);
+    max-width: 800px; /* Limit maximum width for larger screens */
+    width: 100%; /* Take full width up to max-width */
   }
 
-  .user-list.two-users {
-      grid-template-columns: 1fr 1fr;
+  .user-list.two-users .user-item {
+    max-height: calc(50vh - 100px);
+    max-width: 600px; /* Limit maximum width for larger screens */
+    width: 100%; /* Take full width up to max-width */
   }
 }
 
 @media (max-width: 767px) {
   .user-list {
       grid-template-columns: 1fr;
+      gap: 1rem;
+  }
+
+  .user-item {
+      max-height: 50vh;
   }
 }
 
@@ -345,6 +367,7 @@ input[type="text"]:focus {
 
 .network-speed {
   display: flex;
+  margin-right: 0.5em;
   align-items: center;
 }
 
@@ -509,6 +532,7 @@ input[type="text"]:focus {
 }
 
 .room-container {
+  padding-bottom: 150px;
     max-width: 100%;
     padding: 1rem;
     display: flex;

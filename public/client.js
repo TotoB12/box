@@ -28,6 +28,7 @@ const roomIdInput = document.getElementById("roomId");
 const updateUserNameInput = document.getElementById("updateUserName");
 const userListContainer = document.getElementById("userList");
 const stopwatchElement = document.getElementById("stopwatch");
+const roomContainer = document.querySelector(".room-container");
 
 if (joinRoomBtn) {
     joinRoomBtn.addEventListener("click", joinRoom);
@@ -184,9 +185,6 @@ async function initializeRoom(roomId) {
         controlsContainer.className = "room-controls";
         controlsContainer.appendChild(document.querySelector(".user-controls"));
         document.body.appendChild(controlsContainer);
-
-        const roomContainer = document.querySelector(".room-container");
-        roomContainer.style.paddingBottom = "80px";
     } catch (error) {
         console.error("Error accessing media devices:", error);
         alert(
