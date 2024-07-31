@@ -370,37 +370,6 @@ function updateUserListLayout(userCount) {
     }
 }
 
-function addUser(user) {
-    const userItem = document.createElement("div");
-    userItem.className = "user-item";
-    userItem.dataset.userId = user.id;
-
-    userItem.innerHTML = `
-        <div class="video-container" id="video-${user.id}"></div>
-        <div class="status-bar">
-            <div class="left-container">
-                <i class="fas mic-icon fa-microphone${user.muted ? "-slash mic-off" : " mic-on"}"></i>
-                <i class="fas video-icon fa-video${user.videoOff ? "-slash video-off" : " video-on"}"></i>
-                <span class="user-list-name">${user.name}</span>
-            </div>
-            <div class="right-container">
-                <div class="network-speed">
-                    <div class="network-bar"></div>
-                    <div class="network-bar"></div>
-                    <div class="network-bar"></div>
-                </div>
-            </div>
-        </div>
-    `;
-
-    userListContainer.appendChild(userItem);
-    updateNetworkSpeedIndicator(user.id, peerPingTimes[user.id] || 300);
-
-    if (userVideoStreams[user.id]) {
-        attachVideoStream(user.id, userVideoStreams[user.id]);
-    }
-}
-
 function updateUser(user) {
     const userItem = document.querySelector(
         `.user-item[data-user-id="${user.id}"]`,
@@ -433,6 +402,37 @@ function updateUser(user) {
         if (userVideoStreams[user.id]) {
             attachVideoStream(user.id, userVideoStreams[user.id]);
         }
+    }
+}
+
+function addUser(user) {
+    const userItem = document.createElement("div");
+    userItem.className = "user-item";
+    userItem.dataset.userId = user.id;
+
+    userItem.innerHTML = `
+        <div class="video-container" id="video-${user.id}"></div>
+        <div class="status-bar">
+            <div class="left-container">
+                <i class="fas mic-icon fa-microphone${user.muted ? "-slash mic-off" : " mic-on"}"></i>
+                <i class="fas video-icon fa-video${user.videoOff ? "-slash video-off" : " video-on"}"></i>
+                <span class="user-list-name">${user.name}</span>
+            </div>
+            <div class="right-container">
+                <div class="network-speed">
+                    <div class="network-bar"></div>
+                    <div class="network-bar"></div>
+                    <div class="network-bar"></div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    userListContainer.appendChild(userItem);
+    updateNetworkSpeedIndicator(user.id, peerPingTimes[user.id] || 300);
+
+    if (userVideoStreams[user.id]) {
+        attachVideoStream(user.id, userVideoStreams[user.id]);
     }
 }
 
