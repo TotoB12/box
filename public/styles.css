@@ -242,7 +242,7 @@ input[type="text"]:focus {
   gap: 1rem;
   height: 100%;
   width: 100%;
-  justify-content: center; /* Center items horizontally */
+  justify-content: center;
 }
 
 .user-item {
@@ -252,8 +252,22 @@ input[type="text"]:focus {
   max-width: 100%;
   max-height: 70vh;
   aspect-ratio: 16 / 9;
-  justify-self: center; /* Center each item within its grid cell */
-  width: 100%; /* Ensure the item takes full width of its cell */
+  justify-self: center;
+  width: 100%;
+}
+
+.video-off-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #000;
+}
+
+.user-icon {
+  font-size: 48px;
+  color: #fff;
 }
 
 .video-container {
@@ -264,6 +278,7 @@ input[type="text"]:focus {
   align-items: center;
   border-radius: 12px;
   overflow: hidden;
+  background-color: #000;
 }
 
 .video-container video {
@@ -310,14 +325,14 @@ input[type="text"]:focus {
 
   .user-list.single-user .user-item {
     max-height: calc(100vh - 200px);
-    max-width: 800px; /* Limit maximum width for larger screens */
-    width: 100%; /* Take full width up to max-width */
+    max-width: 800px;
+    width: 100%;
   }
 
   .user-list.two-users .user-item {
     max-height: calc(50vh - 100px);
-    max-width: 600px; /* Limit maximum width for larger screens */
-    width: 100%; /* Take full width up to max-width */
+    max-width: 600px;
+    width: 100%;
   }
 }
 
@@ -532,11 +547,11 @@ input[type="text"]:focus {
 }
 
 .room-container {
-  padding-bottom: 150px;
-    max-width: 100%;
-    padding: 1rem;
-    display: flex;
-    flex-direction: column;
+  margin-bottom: 120px;
+  max-width: 100%;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
 }
 
 .top-row {

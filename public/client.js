@@ -238,12 +238,10 @@ async function flipCamera() {
     if (availableCameras.length < 2) return;
 
     if (frontCamera && backCamera) {
-        // On mobile, just switch between front and back
         currentCameraIndex = (currentCameraIndex === availableCameras.indexOf(frontCamera)) 
             ? availableCameras.indexOf(backCamera) 
             : availableCameras.indexOf(frontCamera);
     } else {
-        // On desktop or when front/back can't be identified, cycle through all cameras
         currentCameraIndex = (currentCameraIndex + 1) % availableCameras.length;
     }
 
@@ -376,6 +374,7 @@ function updateUser(user) {
         const nameElement = userItem.querySelector(".user-list-name");
         const micIcon = userItem.querySelector(".mic-icon");
         const videoIcon = userItem.querySelector(".video-icon");
+        const videoContainer = userItem.querySelector(".video-container");
 
         if (nameElement.textContent !== user.name) {
             nameElement.textContent = user.name;
@@ -395,6 +394,7 @@ function updateUser(user) {
             videoIcon.classList.toggle("fa-video", !user.videoOff);
             videoIcon.classList.toggle("video-off", user.videoOff);
             videoIcon.classList.toggle("video-on", !user.videoOff);
+            toggleVideoPlaceholder(videoContainer, user.videoOff);
         }
 
         if (userVideoStreams[user.id]) {
@@ -429,8 +429,37 @@ function addUser(user) {
     userListContainer.appendChild(userItem);
     updateNetworkSpeedIndicator(user.id, peerPingTimes[user.id] || 300);
 
+    const videoContainer = userItem.querySelector(".video-container");
+    toggleVideoPlaceholder(videoContainer, user.videoOff);
+
     if (userVideoStreams[user.id]) {
         attachVideoStream(user.id, userVideoStreams[user.id]);
+    }
+}
+
+function toggleVideoPlaceholder(videoContainer, isVideoOff) {
+    if (isVideoOff) {
+        let placeholder = videoContainer.querySelector(".video-off-placeholder");
+        if (!placeholder) {
+            placeholder = document.createElement("div");
+            placeholder.className = "video-off-placeholder";
+            placeholder.innerHTML = '<i class="fas fa-user user-icon"></i>';
+            videoContainer.appendChild(placeholder);
+        }
+        const videoElement = videoContainer.querySelector("video");
+        if (videoElement) {
+            videoElement.style.display = "none";
+        }
+        placeholder.style.display = "flex";
+    } else {
+        const placeholder = videoContainer.querySelector(".video-off-placeholder");
+        if (placeholder) {
+            placeholder.style.display = "none";
+        }
+        const videoElement = videoContainer.querySelector("video");
+        if (videoElement) {
+            videoElement.style.display = "block";
+        }
     }
 }
 
@@ -510,6 +539,11 @@ function attachVideoStream(userId, stream) {
             videoContainer.appendChild(videoElement);
         }
         videoElement.srcObject = stream;
+
+        const userItem = videoContainer.closest('.user-item');
+        const videoIcon = userItem.querySelector('.video-icon');
+        const isVideoOff = videoIcon.classList.contains('fa-video-slash');
+        toggleVideoPlaceholder(videoContainer, isVideoOff);
     }
 }
 
