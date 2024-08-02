@@ -44,14 +44,14 @@ io.on("connection", (socket) => {
     rooms.get(roomId).set(socket.id, {
       id: socket.id,
       name: userName,
-      muted: false,
+      muted: true,
       videoOff: true,
     });
 
     io.to(roomId).emit("user-connected", {
       id: socket.id,
       name: userName,
-      muted: false,
+      muted: true,
       videoOff: true,
     });
     io.to(roomId).emit(
@@ -101,6 +101,12 @@ io.on("connection", (socket) => {
             Array.from(rooms.get(currentRoom).values()),
           );
         }
+      }
+    });
+
+    socket.on("heartbeat", () => {
+      if (currentRoom) {
+        socket.to(currentRoom).emit("heartbeat", socket.id);
       }
     });
   });

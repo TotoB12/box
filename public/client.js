@@ -168,6 +168,7 @@ async function initializeRoom(roomId) {
             mySocketId = socket.id;
             socket.emit("join-room", { roomId, userName });
             startStopwatch();
+            startHeartbeat();
         });
 
         socket.on("user-connected", handleUserConnected);
@@ -176,6 +177,7 @@ async function initializeRoom(roomId) {
         socket.on("offer", handleOffer);
         socket.on("answer", handleAnswer);
         socket.on("ice-candidate", handleNewICECandidateMsg);
+        socket.on("heartbeat", handleHeartbeat);
 
         toggleMicrophone();
         toggleVideo();
@@ -798,6 +800,18 @@ function updateStopwatch() {
     );
     const seconds = String(elapsedTime % 60).padStart(2, "0");
     stopwatchElement.textContent = `${hours}:${minutes}:${seconds}`;
+}
+
+function startHeartbeat() {
+    setInterval(() => {
+        if (socket) {
+            socket.emit("heartbeat");
+        }
+    }, 1000);
+}
+
+function handleHeartbeat(senderId) {
+    console.log(`Received heartbeat from user ${senderId}`);
 }
 
 document.addEventListener("DOMContentLoaded", initializePage);
