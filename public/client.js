@@ -417,6 +417,19 @@ function addUser(user) {
     userItem.dataset.userId = user.id;
 
     userItem.innerHTML = `
+        <button class="menu-btn" aria-label="User Options">
+            <i class="fas fa-ellipsis-v"></i>
+        </button>
+        <div class="dropdown-menu">
+            <label class="dropdown-item">
+                Captions
+                <input type="checkbox" class="toggle-input captions-toggle" data-user-id="${user.id}" />
+                <span class="toggle-slider"></span>
+            </label>
+            <button class="fullscreen-btn dropdown-item" data-user-id="${user.id}">
+                <i class="fas fa-expand"></i> Fullscreen
+            </button>
+        </div>
         <div class="video-container" id="video-${user.id}"></div>
         <div class="status-bar">
             <div class="left-container">
@@ -442,7 +455,63 @@ function addUser(user) {
     if (userVideoStreams[user.id]) {
         attachVideoStream(user.id, userVideoStreams[user.id]);
     }
+
+    const menuBtn = userItem.querySelector(".menu-btn");
+    const dropdownMenu = userItem.querySelector(".dropdown-menu");
+
+    menuBtn.addEventListener("click", (event) => {
+        event.stopPropagation();
+        dropdownMenu.classList.toggle("open");
+        menuBtn.classList.toggle("menu-btn-active");
+    });
+
+    dropdownMenu.addEventListener("click", (event) => {
+        event.stopPropagation();
+    });
+
+    document.addEventListener("click", handleClickOutside);
+    document.addEventListener("touchstart", handleClickOutside);
+
+    function handleClickOutside(event) {
+        if (
+            !dropdownMenu.contains(event.target) &&
+            !menuBtn.contains(event.target) &&
+            dropdownMenu.classList.contains("open")
+        ) {
+            dropdownMenu.classList.remove("open");
+            menuBtn.classList.remove("menu-btn-active");
+        }
+    }
+
+    const captionsToggle = userItem.querySelector(".captions-toggle");
+    captionsToggle.addEventListener("change", () => {
+        const userId = captionsToggle.dataset.userId;
+        const isChecked = captionsToggle.checked;
+        toggleCaptions(userId, isChecked);
+    });
+
+    const fullscreenBtn = userItem.querySelector(".fullscreen-btn");
+    fullscreenBtn.addEventListener("click", () => {
+        toggleFullscreen(videoContainer);
+    });
 }
+
+function toggleCaptions(userId, isEnabled) {
+    console.log(
+        `Captions for user ${userId} are now ${isEnabled ? "enabled" : "disabled"}.`,
+    );
+}
+
+function toggleFullscreen(element) {
+    if (!document.fullscreenElement) {
+        element.requestFullscreen().catch(err => {
+            console.error(`Error attempting to enable fullscreen mode: ${err.message} (${err.name})`);
+        });
+    } else {
+        document.exitFullscreen();
+    }
+}
+
 
 function toggleVideoPlaceholder(videoContainer, isVideoOff) {
     if (isVideoOff) {
