@@ -282,11 +282,6 @@ input[type="text"]:focus {
   display: block;
 }
 
-/* .menu-btn:hover,
-.menu-btn-active {
-  background-color: var(--primary-variant);
-} */
-
 .user-item:hover .menu-btn {
   display: block;
 }
