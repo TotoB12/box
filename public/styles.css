@@ -8,6 +8,7 @@
   --text-secondary: #b0b0b0;
   --error-color: #cf6679;
   --green-color: #4CAF50;
+  --yellow-color: #FFEB3B;
   --red-color: #F44336;
 }
 
@@ -399,7 +400,7 @@ input[type="text"]:focus {
 }
 
 .network-bar.active.medium {
-  background-color: var(--secondary-color);
+  background-color: var(--yellow-color);
 }
 
 .network-bar.active.slow {

@@ -2,8 +2,6 @@ let socket;
 let localStream;
 let localVideoStream;
 let peerConnections = {};
-let peerPingTimes = {};
-let pingIntervals = {};
 let userVideoStreams = {};
 const cleanupFunctions = {};
 let userName = localStorage.getItem("userName") || "Guest";
@@ -178,6 +176,7 @@ async function initializeRoom(roomId) {
         socket.on("answer", handleAnswer);
         socket.on("ice-candidate", handleNewICECandidateMsg);
         socket.on("heartbeat", handleHeartbeat);
+        socket.on("update-ping", handleUpdatePing);
 
         toggleMicrophone();
         toggleVideo();
@@ -311,10 +310,6 @@ function handleUserDisconnected(userId) {
         peerConnections[userId].close();
         delete peerConnections[userId];
     }
-    if (pingIntervals[userId]) {
-        clearInterval(pingIntervals[userId]);
-        delete pingIntervals[userId];
-    }
     if (cleanupFunctions[userId]) {
         cleanupFunctions[userId]();
         delete cleanupFunctions[userId];
@@ -429,7 +424,6 @@ function addUser(user) {
     `;
 
     userListContainer.appendChild(userItem);
-    updateNetworkSpeedIndicator(user.id, peerPingTimes[user.id] || 300);
 
     const videoContainer = userItem.querySelector(".video-container");
     toggleVideoPlaceholder(videoContainer, user.videoOff);
@@ -525,8 +519,6 @@ function createPeerConnection(userId) {
 
     peerConnections[userId] = peerConnection;
 
-    pingIntervals[userId] = measurePingTime(userId);
-
     return peerConnection;
 }
 
@@ -609,34 +601,7 @@ function hideTalkingIndicator(userId) {
     }
 }
 
-function measurePingTime(userId) {
-    const intervalId = setInterval(() => {
-        if (peerConnections[userId]) {
-            const start = Date.now();
-            peerConnections[userId]
-                .getStats()
-                .then(() => {
-                    const pingTime = Date.now() - start;
-                    peerPingTimes[userId] = pingTime;
-                    updateNetworkSpeedIndicator(userId, pingTime);
-                })
-                .catch((error) => {
-                    console.error("Error measuring ping time:", error);
-                    clearInterval(intervalId);
-                });
-        } else {
-            console.log(
-                `Peer connection for user ${userId} no longer exists. Stopping ping measurements.`,
-            );
-            clearInterval(intervalId);
-        }
-    }, 5000);
-
-    return intervalId;
-}
-
 function updateNetworkSpeedIndicator(userId, pingTime) {
-    console.log(pingTime);
     const userItem = document.querySelector(
         `.user-item[data-user-id="${userId}"]`,
     );
@@ -805,13 +770,19 @@ function updateStopwatch() {
 function startHeartbeat() {
     setInterval(() => {
         if (socket) {
-            socket.emit("heartbeat");
+            socket.emit("heartbeat", Date.now());
         }
     }, 1000);
 }
 
-function handleHeartbeat(senderId) {
-    console.log(`Received heartbeat from user ${senderId}`);
+function handleHeartbeat({ senderId, timestamp }) {
+    const receiveTime = Date.now();
+    const roundTripTime = receiveTime - timestamp;
+    socket.emit("heartbeat-ack", { targetId: senderId, roundTripTime });
+}
+
+function handleUpdatePing({ senderId, pingTime }) {
+    updateNetworkSpeedIndicator(senderId, pingTime);
 }
 
 document.addEventListener("DOMContentLoaded", initializePage);

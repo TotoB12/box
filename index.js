@@ -104,9 +104,15 @@ io.on("connection", (socket) => {
       }
     });
 
-    socket.on("heartbeat", () => {
+    socket.on("heartbeat", (timestamp) => {
       if (currentRoom) {
-        socket.to(currentRoom).emit("heartbeat", socket.id);
+        socket.to(currentRoom).emit("heartbeat", { senderId: socket.id, timestamp });
+      }
+    });
+
+    socket.on("heartbeat-ack", ({ targetId, roundTripTime }) => {
+      if (currentRoom) {
+        socket.to(targetId).emit("update-ping", { senderId: socket.id, pingTime: roundTripTime });
       }
     });
   });
