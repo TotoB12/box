@@ -198,29 +198,37 @@ async function initializeRoom(roomId) {
 async function initializeVideoDevices() {
     try {
         const devices = await navigator.mediaDevices.enumerateDevices();
-        availableCameras = devices.filter(device => device.kind === 'videoinput');
+        availableCameras = devices.filter(
+            (device) => device.kind === "videoinput",
+        );
 
-        frontCamera = availableCameras.find(device => device.label.toLowerCase().includes('front'));
-        backCamera = availableCameras.find(device => device.label.toLowerCase().includes('back'));
+        frontCamera = availableCameras.find((device) =>
+            device.label.toLowerCase().includes("front"),
+        );
+        backCamera = availableCameras.find((device) =>
+            device.label.toLowerCase().includes("back"),
+        );
 
         if (frontCamera && backCamera) {
-            console.log('Front and back cameras identified');
+            console.log("Front and back cameras identified");
         } else {
-            console.log('Unable to identify front and back cameras, will cycle through all cameras');
+            console.log(
+                "Unable to identify front and back cameras, will cycle through all cameras",
+            );
         }
 
         if (availableCameras.length > 0) {
             localVideoStream = await navigator.mediaDevices.getUserMedia({
-                video: { deviceId: availableCameras[0].deviceId }
+                video: { deviceId: availableCameras[0].deviceId },
             });
         } else {
-            console.warn('No video input devices found');
+            console.warn("No video input devices found");
             localVideoStream = new MediaStream();
         }
 
         updateFlipCameraButtonVisibility();
     } catch (error) {
-        console.error('Error initializing video devices:', error);
+        console.error("Error initializing video devices:", error);
         localVideoStream = new MediaStream();
     }
 }
@@ -228,9 +236,9 @@ async function initializeVideoDevices() {
 function updateFlipCameraButtonVisibility() {
     if (flipCameraBtn) {
         if (availableCameras.length > 1 && videoSwitch.checked) {
-            flipCameraBtn.classList.add('visible');
+            flipCameraBtn.classList.add("visible");
         } else {
-            flipCameraBtn.classList.remove('visible');
+            flipCameraBtn.classList.remove("visible");
         }
     }
 }
@@ -239,9 +247,10 @@ async function flipCamera() {
     if (availableCameras.length < 2) return;
 
     if (frontCamera && backCamera) {
-        currentCameraIndex = (currentCameraIndex === availableCameras.indexOf(frontCamera)) 
-            ? availableCameras.indexOf(backCamera) 
-            : availableCameras.indexOf(frontCamera);
+        currentCameraIndex =
+            currentCameraIndex === availableCameras.indexOf(frontCamera)
+                ? availableCameras.indexOf(backCamera)
+                : availableCameras.indexOf(frontCamera);
     } else {
         currentCameraIndex = (currentCameraIndex + 1) % availableCameras.length;
     }
@@ -250,10 +259,10 @@ async function flipCamera() {
 
     try {
         const newVideoStream = await navigator.mediaDevices.getUserMedia({
-            video: { deviceId: newCameraId }
+            video: { deviceId: newCameraId },
         });
 
-        localVideoStream.getVideoTracks().forEach(track => track.stop());
+        localVideoStream.getVideoTracks().forEach((track) => track.stop());
 
         const [newVideoTrack] = newVideoStream.getVideoTracks();
         localVideoStream.removeTrack(localVideoStream.getVideoTracks()[0]);
@@ -261,17 +270,19 @@ async function flipCamera() {
 
         toggleLocalVideoPreview(videoSwitch.checked);
 
-        Object.values(peerConnections).forEach(pc => {
-            const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
+        Object.values(peerConnections).forEach((pc) => {
+            const sender = pc
+                .getSenders()
+                .find((s) => s.track && s.track.kind === "video");
             if (sender) {
                 sender.replaceTrack(newVideoTrack);
             }
         });
 
-        socket.emit('camera-changed');
+        socket.emit("camera-changed");
     } catch (error) {
-        console.error('Error flipping camera:', error);
-        alert('Failed to switch camera. Please try again.');
+        console.error("Error flipping camera:", error);
+        alert("Failed to switch camera. Please try again.");
     }
 }
 
@@ -435,7 +446,9 @@ function addUser(user) {
 
 function toggleVideoPlaceholder(videoContainer, isVideoOff) {
     if (isVideoOff) {
-        let placeholder = videoContainer.querySelector(".video-off-placeholder");
+        let placeholder = videoContainer.querySelector(
+            ".video-off-placeholder",
+        );
         if (!placeholder) {
             placeholder = document.createElement("div");
             placeholder.className = "video-off-placeholder";
@@ -448,7 +461,9 @@ function toggleVideoPlaceholder(videoContainer, isVideoOff) {
         }
         placeholder.style.display = "flex";
     } else {
-        const placeholder = videoContainer.querySelector(".video-off-placeholder");
+        const placeholder = videoContainer.querySelector(
+            ".video-off-placeholder",
+        );
         if (placeholder) {
             placeholder.style.display = "none";
         }
@@ -534,9 +549,9 @@ function attachVideoStream(userId, stream) {
         }
         videoElement.srcObject = stream;
 
-        const userItem = videoContainer.closest('.user-item');
-        const videoIcon = userItem.querySelector('.video-icon');
-        const isVideoOff = videoIcon.classList.contains('fa-video-slash');
+        const userItem = videoContainer.closest(".user-item");
+        const videoIcon = userItem.querySelector(".video-icon");
+        const isVideoOff = videoIcon.classList.contains("fa-video-slash");
         toggleVideoPlaceholder(videoContainer, isVideoOff);
     }
 }
