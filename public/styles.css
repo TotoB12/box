@@ -314,7 +314,7 @@ input[type="text"]:focus {
 .dropdown-item {
   display: flex;
   align-items: center;
-  justify-content: start;
+  justify-content: space-between;
   gap: 5px;
   padding: 0.5rem 1rem;
   color: var(--text-color);
@@ -540,6 +540,12 @@ input[type="text"]:focus {
 
 .network-bar.active.slow {
   background-color: var(--error-color);
+}
+
+.ping-indicator {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-right: 0.5em;
 }
 
 .modal {

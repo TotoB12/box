@@ -433,6 +433,11 @@ function addUser(user) {
                 <input type="checkbox" class="toggle-input captions-toggle" data-user-id="${user.id}" />
                 <span class="toggle-slider"></span>
             </label>
+            <label class="dropdown-item">
+                Show Ping
+                <input type="checkbox" class="toggle-input ping-toggle" data-user-id="${user.id}" />
+                <span class="toggle-slider"></span>
+            </label>
             <button class="fullscreen-btn dropdown-item" data-user-id="${user.id}">
                 <i class="fas fa-expand"></i> Fullscreen
             </button>
@@ -445,6 +450,7 @@ function addUser(user) {
                 <span class="user-list-name">${user.name}</span>
             </div>
             <div class="right-container">
+                <span class="ping-indicator" data-user-id="${user.id}" style="display:none;">0</span>
                 <div class="network-speed">
                     <div class="network-bar"></div>
                     <div class="network-bar"></div>
@@ -495,6 +501,13 @@ function addUser(user) {
         const userId = captionsToggle.dataset.userId;
         const isChecked = captionsToggle.checked;
         toggleCaptions(userId, isChecked);
+    });
+
+    const pingToggle = userItem.querySelector(".ping-toggle");
+    pingToggle.addEventListener("change", () => {
+        const userId = pingToggle.dataset.userId;
+        const isChecked = pingToggle.checked;
+        togglePingDisplay(userId, isChecked);
     });
 
     const fullscreenBtn = userItem.querySelector(".fullscreen-btn");
@@ -685,6 +698,13 @@ function hideTalkingIndicator(userId) {
         if (talkingIndicator) {
             talkingIndicator.remove();
         }
+    }
+}
+
+function togglePingDisplay(userId, showPing) {
+    const pingIndicator = document.querySelector(`.ping-indicator[data-user-id="${userId}"]`);
+    if (pingIndicator) {
+        pingIndicator.style.display = showPing ? "inline" : "none";
     }
 }
 
@@ -927,6 +947,12 @@ function handleHeartbeat({ senderId, timestamp }) {
 
 function handleUpdatePing({ senderId, pingTime }) {
     updateNetworkSpeedIndicator(senderId, pingTime);
+
+    const pingIndicator = document.querySelector(`.ping-indicator[data-user-id="${senderId}"]`);
+    if (pingIndicator && pingIndicator.style.display === "inline") {
+        pingIndicator.textContent = `${pingTime}`;
+    }
 }
+
 
 document.addEventListener("DOMContentLoaded", initializePage);
