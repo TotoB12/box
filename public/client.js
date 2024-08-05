@@ -151,7 +151,6 @@ async function initializeRoom(roomId) {
     showLoadingAnimation();
 
     try {
-        // await initializeStreams();
         socket = io();
 
         socket.on("connect", () => {
@@ -170,20 +169,22 @@ async function initializeRoom(roomId) {
         socket.on("heartbeat", handleHeartbeat);
         socket.on("update-ping", handleUpdatePing);
 
-        updateToggleStates();
+                updateToggleStates();
 
-        const controlsContainer = document.createElement("div");
-        controlsContainer.className = "room-controls";
-        controlsContainer.appendChild(document.querySelector(".user-controls"));
-        document.body.appendChild(controlsContainer);
-    } catch (error) {
-        console.error("Error initializing room:", error);
-        alert(
-            "Unable to initialize the room. Please check your settings and try again.",
-        );
-        hideLoadingAnimation();
-    }
-}
+                await initializeVideoDevices();
+
+                const controlsContainer = document.createElement("div");
+                controlsContainer.className = "room-controls";
+                controlsContainer.appendChild(document.querySelector(".user-controls"));
+                document.body.appendChild(controlsContainer);
+            } catch (error) {
+                console.error("Error initializing room:", error);
+                alert(
+                    "Unable to initialize the room. Please check your settings and try again.",
+                );
+                hideLoadingAnimation();
+            }
+        }
 
 // async function initializeStreams() {
 // }
@@ -230,37 +231,27 @@ async function initializeVideoDevices() {
     try {
         const devices = await navigator.mediaDevices.enumerateDevices();
         availableCameras = devices.filter(
-            (device) => device.kind === "videoinput",
+            (device) => device.kind === "videoinput"
         );
 
         frontCamera = availableCameras.find((device) =>
-            device.label.toLowerCase().includes("front"),
+            device.label.toLowerCase().includes("front")
         );
         backCamera = availableCameras.find((device) =>
-            device.label.toLowerCase().includes("back"),
+            device.label.toLowerCase().includes("back")
         );
 
         if (frontCamera && backCamera) {
             console.log("Front and back cameras identified");
         } else {
             console.log(
-                "Unable to identify front and back cameras, will cycle through all cameras",
+                "Unable to identify front and back cameras, will cycle through all cameras"
             );
-        }
-
-        if (availableCameras.length > 0) {
-            localVideoStream = await navigator.mediaDevices.getUserMedia({
-                video: { deviceId: availableCameras[0].deviceId },
-            });
-        } else {
-            console.warn("No video input devices found");
-            localVideoStream = new MediaStream();
         }
 
         updateFlipCameraButtonVisibility();
     } catch (error) {
         console.error("Error initializing video devices:", error);
-        localVideoStream = new MediaStream();
     }
 }
 
@@ -802,6 +793,9 @@ async function toggleVideo() {
         try {
             const videoStream = await getVideoStream();
             videoTrack = videoStream.getVideoTracks()[0];
+
+            // Re-initialize video devices after permission is granted
+            await initializeVideoDevices();
         } catch (error) {
             console.error("Error accessing camera:", error);
             videoSwitch.checked = false;
