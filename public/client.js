@@ -1,8 +1,6 @@
 let socket;
 let localAudioStream;
 let localVideoStream;
-// let emptyAudioStream;
-// let emptyVideoStream;
 let peerConnections = {};
 let userVideoStreams = {};
 const cleanupFunctions = {};
@@ -185,9 +183,6 @@ async function initializeRoom(roomId) {
                 hideLoadingAnimation();
             }
         }
-
-// async function initializeStreams() {
-// }
 
 async function getAudioStream() {
     if (localAudioStream) {
@@ -606,7 +601,6 @@ function createPeerConnection(userId) {
         }
     };
 
-    // Add empty tracks initially
     peerConnection.addTrack(createEmptyAudioStream().getAudioTracks()[0], new MediaStream());
     peerConnection.addTrack(createEmptyVideoStream().getVideoTracks()[0], new MediaStream());
 
@@ -794,7 +788,6 @@ async function toggleVideo() {
             const videoStream = await getVideoStream();
             videoTrack = videoStream.getVideoTracks()[0];
 
-            // Re-initialize video devices after permission is granted
             await initializeVideoDevices();
         } catch (error) {
             console.error("Error accessing camera:", error);
