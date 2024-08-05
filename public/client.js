@@ -1,6 +1,8 @@
 let socket;
-let localStream;
+let localAudioStream;
 let localVideoStream;
+// let emptyAudioStream;
+// let emptyVideoStream;
 let peerConnections = {};
 let userVideoStreams = {};
 const cleanupFunctions = {};
@@ -37,18 +39,11 @@ if (settingsBtn) {
 }
 
 if (micSwitch) {
-    micSwitch.addEventListener("change", function () {
-        toggleMicrophone();
-        updateMicIcon(this.checked);
-    });
+    micSwitch.addEventListener("change", toggleMicrophone);
 }
 
 if (videoSwitch) {
-    videoSwitch.addEventListener("change", function () {
-        toggleVideo();
-        updateVideoIcon(this.checked);
-        toggleLocalVideoPreview(this.checked);
-    });
+    videoSwitch.addEventListener("change", toggleVideo);
 }
 
 if (flipCameraBtn) {
@@ -156,10 +151,7 @@ async function initializeRoom(roomId) {
     showLoadingAnimation();
 
     try {
-        localStream = await navigator.mediaDevices.getUserMedia({
-            audio: true,
-        });
-        await initializeVideoDevices();
+        // await initializeStreams();
         socket = io();
 
         socket.on("connect", () => {
@@ -178,21 +170,60 @@ async function initializeRoom(roomId) {
         socket.on("heartbeat", handleHeartbeat);
         socket.on("update-ping", handleUpdatePing);
 
-        toggleMicrophone();
-        toggleVideo();
-        toggleLocalVideoPreview(videoSwitch.checked);
+        updateToggleStates();
 
         const controlsContainer = document.createElement("div");
         controlsContainer.className = "room-controls";
         controlsContainer.appendChild(document.querySelector(".user-controls"));
         document.body.appendChild(controlsContainer);
     } catch (error) {
-        console.error("Error accessing media devices:", error);
+        console.error("Error initializing room:", error);
         alert(
-            "Unable to access the microphone or camera. Please check your settings and try again.",
+            "Unable to initialize the room. Please check your settings and try again.",
         );
         hideLoadingAnimation();
     }
+}
+
+// async function initializeStreams() {
+// }
+
+async function getAudioStream() {
+    if (localAudioStream) {
+        localAudioStream.getTracks().forEach(track => track.stop());
+    }
+    localAudioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    return localAudioStream;
+}
+
+async function getVideoStream() {
+    if (localVideoStream) {
+        localVideoStream.getTracks().forEach(track => track.stop());
+    }
+    const videoConstraints = { video: true };
+    if (availableCameras.length > 0) {
+        videoConstraints.video = { deviceId: availableCameras[currentCameraIndex].deviceId };
+    }
+    localVideoStream = await navigator.mediaDevices.getUserMedia(videoConstraints);
+    return localVideoStream;
+}
+
+function createEmptyAudioStream() {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = ctx.createOscillator();
+    const dst = oscillator.connect(ctx.createMediaStreamDestination());
+    oscillator.start();
+    const track = dst.stream.getAudioTracks()[0];
+    track.enabled = false;
+    return new MediaStream([track]);
+}
+
+function createEmptyVideoStream() {
+    const canvas = Object.assign(document.createElement("canvas"), { width: 640, height: 480 });
+    canvas.getContext("2d").fillRect(0, 0, canvas.width, canvas.height);
+    const stream = canvas.captureStream();
+    stream.getVideoTracks()[0].enabled = false;
+    return stream;
 }
 
 async function initializeVideoDevices() {
@@ -244,7 +275,7 @@ function updateFlipCameraButtonVisibility() {
 }
 
 async function flipCamera() {
-    if (availableCameras.length < 2) return;
+    if (availableCameras.length < 2 || !videoSwitch.checked) return;
 
     if (frontCamera && backCamera) {
         currentCameraIndex =
@@ -255,20 +286,9 @@ async function flipCamera() {
         currentCameraIndex = (currentCameraIndex + 1) % availableCameras.length;
     }
 
-    const newCameraId = availableCameras[currentCameraIndex].deviceId;
-
     try {
-        const newVideoStream = await navigator.mediaDevices.getUserMedia({
-            video: { deviceId: newCameraId },
-        });
-
-        localVideoStream.getVideoTracks().forEach((track) => track.stop());
-
+        const newVideoStream = await getVideoStream();
         const [newVideoTrack] = newVideoStream.getVideoTracks();
-        localVideoStream.removeTrack(localVideoStream.getVideoTracks()[0]);
-        localVideoStream.addTrack(newVideoTrack);
-
-        toggleLocalVideoPreview(videoSwitch.checked);
 
         Object.values(peerConnections).forEach((pc) => {
             const sender = pc
@@ -279,6 +299,7 @@ async function flipCamera() {
             }
         });
 
+        toggleLocalVideoPreview(true);
         socket.emit("camera-changed");
     } catch (error) {
         console.error("Error flipping camera:", error);
@@ -594,13 +615,9 @@ function createPeerConnection(userId) {
         }
     };
 
-    localStream.getTracks().forEach((track) => {
-        peerConnection.addTrack(track, localStream);
-    });
-
-    localVideoStream.getTracks().forEach((track) => {
-        peerConnection.addTrack(track, localVideoStream);
-    });
+    // Add empty tracks initially
+    peerConnection.addTrack(createEmptyAudioStream().getAudioTracks()[0], new MediaStream());
+    peerConnection.addTrack(createEmptyVideoStream().getVideoTracks()[0], new MediaStream());
 
     peerConnections[userId] = peerConnection;
 
@@ -741,28 +758,83 @@ function handleNewICECandidateMsg(data) {
     peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
 }
 
-function toggleMicrophone() {
-    if (localStream) {
-        const audioTrack = localStream.getAudioTracks()[0];
-        audioTrack.enabled = micSwitch.checked;
-        if (socket) {
-            socket.emit("mute-status", !audioTrack.enabled);
+async function toggleMicrophone() {
+    const isAudioOn = micSwitch.checked;
+    let audioTrack;
+
+    if (isAudioOn) {
+        try {
+            const audioStream = await getAudioStream();
+            audioTrack = audioStream.getAudioTracks()[0];
+        } catch (error) {
+            console.error("Error accessing microphone:", error);
+            micSwitch.checked = false;
+            updateMicIcon(false);
+            alert("Unable to access the microphone. Please check your settings and try again.");
+            return;
         }
+    } else {
+        if (localAudioStream) {
+            localAudioStream.getTracks().forEach(track => track.stop());
+            localAudioStream = null;
+        }
+        audioTrack = createEmptyAudioStream().getAudioTracks()[0];
     }
+
+    Object.values(peerConnections).forEach((pc) => {
+        const sender = pc.getSenders().find(s => s.track && s.track.kind === "audio");
+        if (sender) {
+            sender.replaceTrack(audioTrack);
+        }
+    });
+
+    if (socket) {
+        socket.emit("mute-status", !isAudioOn);
+    }
+    updateMicIcon(isAudioOn);
 }
 
-function toggleVideo() {
-    if (localVideoStream) {
-        const videoTrack = localVideoStream.getVideoTracks()[0];
-        if (videoTrack) {
-            videoTrack.enabled = videoSwitch.checked;
-            updateVideoIcon(videoTrack.enabled);
-            updateFlipCameraButtonVisibility();
-            if (socket) {
-                socket.emit("video-status", !videoTrack.enabled);
-            }
+async function toggleVideo() {
+    const isVideoOn = videoSwitch.checked;
+    let videoTrack;
+
+    if (isVideoOn) {
+        try {
+            const videoStream = await getVideoStream();
+            videoTrack = videoStream.getVideoTracks()[0];
+        } catch (error) {
+            console.error("Error accessing camera:", error);
+            videoSwitch.checked = false;
+            updateVideoIcon(false);
+            alert("Unable to access the camera. Please check your settings and try again.");
+            return;
         }
+    } else {
+        if (localVideoStream) {
+            localVideoStream.getTracks().forEach(track => track.stop());
+            localVideoStream = null;
+        }
+        videoTrack = createEmptyVideoStream().getVideoTracks()[0];
     }
+
+    Object.values(peerConnections).forEach((pc) => {
+        const sender = pc.getSenders().find(s => s.track && s.track.kind === "video");
+        if (sender) {
+            sender.replaceTrack(videoTrack);
+        }
+    });
+
+    if (socket) {
+        socket.emit("video-status", !isVideoOn);
+    }
+    updateVideoIcon(isVideoOn);
+    toggleLocalVideoPreview(isVideoOn);
+    updateFlipCameraButtonVisibility();
+}
+
+function updateToggleStates() {
+    toggleMicrophone();
+    toggleVideo();
 }
 
 function updateMicIcon(isOn) {
@@ -794,7 +866,7 @@ function updateVideoIcon(isOn) {
 function toggleLocalVideoPreview(isOn) {
     const localVideoPreview = document.getElementById("localVideoPreview");
     if (localVideoPreview) {
-        if (isOn) {
+        if (isOn && localVideoStream) {
             localVideoPreview.srcObject = localVideoStream;
             localVideoPreview.style.display = "block";
         } else {
