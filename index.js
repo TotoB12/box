@@ -56,7 +56,7 @@ io.on("connection", (socket) => {
     });
     io.to(roomId).emit(
       "update-user-list",
-      Array.from(rooms.get(roomId).values()),
+      Array.from(rooms.get(roomId).values())
     );
 
     socket.on("disconnect", () => {
@@ -72,7 +72,7 @@ io.on("connection", (socket) => {
           currentUserName = newName;
           io.to(currentRoom).emit(
             "update-user-list",
-            Array.from(rooms.get(currentRoom).values()),
+            Array.from(rooms.get(currentRoom).values())
           );
         }
       }
@@ -85,7 +85,7 @@ io.on("connection", (socket) => {
           user.muted = muted;
           io.to(currentRoom).emit(
             "update-user-list",
-            Array.from(rooms.get(currentRoom).values()),
+            Array.from(rooms.get(currentRoom).values())
           );
         }
       }
@@ -98,7 +98,7 @@ io.on("connection", (socket) => {
           user.videoOff = videoOff;
           io.to(currentRoom).emit(
             "update-user-list",
-            Array.from(rooms.get(currentRoom).values()),
+            Array.from(rooms.get(currentRoom).values())
           );
         }
       }
@@ -126,7 +126,7 @@ io.on("connection", (socket) => {
         io.to(currentRoom).emit("user-disconnected", socket.id);
         io.to(currentRoom).emit(
           "update-user-list",
-          Array.from(rooms.get(currentRoom).values()),
+          Array.from(rooms.get(currentRoom).values())
         );
       }
     }

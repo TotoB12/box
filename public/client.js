@@ -167,40 +167,45 @@ async function initializeRoom(roomId) {
         socket.on("heartbeat", handleHeartbeat);
         socket.on("update-ping", handleUpdatePing);
 
-                updateToggleStates();
+        updateToggleStates();
 
-                await initializeVideoDevices();
+        await initializeVideoDevices();
 
-                const controlsContainer = document.createElement("div");
-                controlsContainer.className = "room-controls";
-                controlsContainer.appendChild(document.querySelector(".user-controls"));
-                document.body.appendChild(controlsContainer);
-            } catch (error) {
-                console.error("Error initializing room:", error);
-                alert(
-                    "Unable to initialize the room. Please check your settings and try again.",
-                );
-                hideLoadingAnimation();
-            }
-        }
+        const controlsContainer = document.createElement("div");
+        controlsContainer.className = "room-controls";
+        controlsContainer.appendChild(document.querySelector(".user-controls"));
+        document.body.appendChild(controlsContainer);
+    } catch (error) {
+        console.error("Error initializing room:", error);
+        alert(
+            "Unable to initialize the room. Please check your settings and try again.",
+        );
+        hideLoadingAnimation();
+    }
+}
 
 async function getAudioStream() {
     if (localAudioStream) {
-        localAudioStream.getTracks().forEach(track => track.stop());
+        localAudioStream.getTracks().forEach((track) => track.stop());
     }
-    localAudioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    localAudioStream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+    });
     return localAudioStream;
 }
 
 async function getVideoStream() {
     if (localVideoStream) {
-        localVideoStream.getTracks().forEach(track => track.stop());
+        localVideoStream.getTracks().forEach((track) => track.stop());
     }
     const videoConstraints = { video: true };
     if (availableCameras.length > 0) {
-        videoConstraints.video = { deviceId: availableCameras[currentCameraIndex].deviceId };
+        videoConstraints.video = {
+            deviceId: availableCameras[currentCameraIndex].deviceId,
+        };
     }
-    localVideoStream = await navigator.mediaDevices.getUserMedia(videoConstraints);
+    localVideoStream =
+        await navigator.mediaDevices.getUserMedia(videoConstraints);
     return localVideoStream;
 }
 
@@ -215,7 +220,10 @@ function createEmptyAudioStream() {
 }
 
 function createEmptyVideoStream() {
-    const canvas = Object.assign(document.createElement("canvas"), { width: 640, height: 480 });
+    const canvas = Object.assign(document.createElement("canvas"), {
+        width: 640,
+        height: 480,
+    });
     canvas.getContext("2d").fillRect(0, 0, canvas.width, canvas.height);
     const stream = canvas.captureStream();
     stream.getVideoTracks()[0].enabled = false;
@@ -226,21 +234,21 @@ async function initializeVideoDevices() {
     try {
         const devices = await navigator.mediaDevices.enumerateDevices();
         availableCameras = devices.filter(
-            (device) => device.kind === "videoinput"
+            (device) => device.kind === "videoinput",
         );
 
         frontCamera = availableCameras.find((device) =>
-            device.label.toLowerCase().includes("front")
+            device.label.toLowerCase().includes("front"),
         );
         backCamera = availableCameras.find((device) =>
-            device.label.toLowerCase().includes("back")
+            device.label.toLowerCase().includes("back"),
         );
 
         if (frontCamera && backCamera) {
             console.log("Front and back cameras identified");
         } else {
             console.log(
-                "Unable to identify front and back cameras, will cycle through all cameras"
+                "Unable to identify front and back cameras, will cycle through all cameras",
             );
         }
 
@@ -614,8 +622,14 @@ function createPeerConnection(userId) {
         }
     };
 
-    peerConnection.addTrack(createEmptyAudioStream().getAudioTracks()[0], new MediaStream());
-    peerConnection.addTrack(createEmptyVideoStream().getVideoTracks()[0], new MediaStream());
+    peerConnection.addTrack(
+        createEmptyAudioStream().getAudioTracks()[0],
+        new MediaStream(),
+    );
+    peerConnection.addTrack(
+        createEmptyVideoStream().getVideoTracks()[0],
+        new MediaStream(),
+    );
 
     peerConnections[userId] = peerConnection;
 
@@ -702,7 +716,9 @@ function hideTalkingIndicator(userId) {
 }
 
 function togglePingDisplay(userId, showPing) {
-    const pingIndicator = document.querySelector(`.ping-indicator[data-user-id="${userId}"]`);
+    const pingIndicator = document.querySelector(
+        `.ping-indicator[data-user-id="${userId}"]`,
+    );
     if (pingIndicator) {
         pingIndicator.style.display = showPing ? "inline" : "none";
     }
@@ -775,19 +791,23 @@ async function toggleMicrophone() {
             console.error("Error accessing microphone:", error);
             micSwitch.checked = false;
             updateMicIcon(false);
-            alert("Unable to access the microphone. Please check your settings and try again.");
+            alert(
+                "Unable to access the microphone. Please check your settings and try again.",
+            );
             return;
         }
     } else {
         if (localAudioStream) {
-            localAudioStream.getTracks().forEach(track => track.stop());
+            localAudioStream.getTracks().forEach((track) => track.stop());
             localAudioStream = null;
         }
         audioTrack = createEmptyAudioStream().getAudioTracks()[0];
     }
 
     Object.values(peerConnections).forEach((pc) => {
-        const sender = pc.getSenders().find(s => s.track && s.track.kind === "audio");
+        const sender = pc
+            .getSenders()
+            .find((s) => s.track && s.track.kind === "audio");
         if (sender) {
             sender.replaceTrack(audioTrack);
         }
@@ -813,19 +833,23 @@ async function toggleVideo() {
             console.error("Error accessing camera:", error);
             videoSwitch.checked = false;
             updateVideoIcon(false);
-            alert("Unable to access the camera. Please check your settings and try again.");
+            alert(
+                "Unable to access the camera. Please check your settings and try again.",
+            );
             return;
         }
     } else {
         if (localVideoStream) {
-            localVideoStream.getTracks().forEach(track => track.stop());
+            localVideoStream.getTracks().forEach((track) => track.stop());
             localVideoStream = null;
         }
         videoTrack = createEmptyVideoStream().getVideoTracks()[0];
     }
 
     Object.values(peerConnections).forEach((pc) => {
-        const sender = pc.getSenders().find(s => s.track && s.track.kind === "video");
+        const sender = pc
+            .getSenders()
+            .find((s) => s.track && s.track.kind === "video");
         if (sender) {
             sender.replaceTrack(videoTrack);
         }
@@ -948,11 +972,12 @@ function handleHeartbeat({ senderId, timestamp }) {
 function handleUpdatePing({ senderId, pingTime }) {
     updateNetworkSpeedIndicator(senderId, pingTime);
 
-    const pingIndicator = document.querySelector(`.ping-indicator[data-user-id="${senderId}"]`);
+    const pingIndicator = document.querySelector(
+        `.ping-indicator[data-user-id="${senderId}"]`,
+    );
     if (pingIndicator && pingIndicator.style.display === "inline") {
         pingIndicator.textContent = `${pingTime}`;
     }
 }
-
 
 document.addEventListener("DOMContentLoaded", initializePage);
