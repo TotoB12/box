@@ -1,0 +1,2410 @@
+I developing a simple communication app called Box. Users can enter rooms and call each others using audio and video using WebRTC. Here is the full project:
+
+index.js
+```javascript
+const express = require("express");
+const http = require("http");
+const socketIo = require("socket.io");
+const path = require("path");
+
+const app = express();
+const server = http.createServer(app);
+const io = socketIo(server);
+
+const PORT = process.env.PORT || 3000;
+
+app.use(express.static(path.join(__dirname, "public")));
+
+app.get("/room/:roomId", (req, res) => {
+  const roomId = req.params.roomId;
+  if (/^\d{4}$/.test(roomId)) {
+    res.sendFile(path.join(__dirname, "public", "room.html"));
+  } else {
+    res.status(404).send("Invalid room ID. Please use a 4-digit number.");
+  }
+});
+
+app.get("*", (req, res) => {
+  res.redirect("/");
+});
+
+const rooms = new Map();
+
+io.on("connection", (socket) => {
+  console.log("A user connected");
+
+  let currentRoom = null;
+  let currentUserName = null;
+
+  socket.on("join-room", ({ roomId, userName }) => {
+    currentRoom = roomId;
+    currentUserName = userName;
+
+    socket.join(roomId);
+
+    if (!rooms.has(roomId)) {
+      rooms.set(roomId, new Map());
+    }
+    rooms.get(roomId).set(socket.id, {
+      id: socket.id,
+      name: userName,
+      muted: true,
+      videoOff: true,
+    });
+
+    io.to(roomId).emit("user-connected", {
+      id: socket.id,
+      name: userName,
+      muted: true,
+      videoOff: true,
+    });
+    io.to(roomId).emit(
+      "update-user-list",
+      Array.from(rooms.get(roomId).values())
+    );
+
+    socket.on("disconnect", () => {
+      console.log("A user disconnected");
+      handleDisconnect();
+    });
+
+    socket.on("update-user-name", (newName) => {
+      if (currentRoom && rooms.has(currentRoom)) {
+        const user = rooms.get(currentRoom).get(socket.id);
+        if (user) {
+          user.name = newName;
+          currentUserName = newName;
+          io.to(currentRoom).emit(
+            "update-user-list",
+            Array.from(rooms.get(currentRoom).values())
+          );
+        }
+      }
+    });
+
+    socket.on("mute-status", (muted) => {
+      if (currentRoom && rooms.has(currentRoom)) {
+        const user = rooms.get(currentRoom).get(socket.id);
+        if (user) {
+          user.muted = muted;
+          io.to(currentRoom).emit(
+            "update-user-list",
+            Array.from(rooms.get(currentRoom).values())
+          );
+        }
+      }
+    });
+
+    socket.on("video-status", (videoOff) => {
+      if (currentRoom && rooms.has(currentRoom)) {
+        const user = rooms.get(currentRoom).get(socket.id);
+        if (user) {
+          user.videoOff = videoOff;
+          io.to(currentRoom).emit(
+            "update-user-list",
+            Array.from(rooms.get(currentRoom).values())
+          );
+        }
+      }
+    });
+
+    socket.on("heartbeat", (timestamp) => {
+      if (currentRoom) {
+        socket.to(currentRoom).emit("heartbeat", { senderId: socket.id, timestamp });
+      }
+    });
+
+    socket.on("heartbeat-ack", ({ targetId, roundTripTime }) => {
+      if (currentRoom) {
+        socket.to(targetId).emit("update-ping", { senderId: socket.id, pingTime: roundTripTime });
+      }
+    });
+  });
+
+  function handleDisconnect() {
+    if (currentRoom && rooms.has(currentRoom)) {
+      rooms.get(currentRoom).delete(socket.id);
+      if (rooms.get(currentRoom).size === 0) {
+        rooms.delete(currentRoom);
+      } else {
+        io.to(currentRoom).emit("user-disconnected", socket.id);
+        io.to(currentRoom).emit(
+          "update-user-list",
+          Array.from(rooms.get(currentRoom).values())
+        );
+      }
+    }
+  }
+
+  socket.on("offer", (data) => {
+    socket.to(data.target).emit("offer", {
+      sdp: data.sdp,
+      sender: socket.id,
+    });
+  });
+
+  socket.on("answer", (data) => {
+    socket.to(data.target).emit("answer", {
+      sdp: data.sdp,
+      sender: socket.id,
+    });
+  });
+
+  socket.on("ice-candidate", (data) => {
+    socket.to(data.target).emit("ice-candidate", {
+      candidate: data.candidate,
+      sender: socket.id,
+    });
+  });
+});
+
+server.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});
+
+```
+
+public\client.js
+```javascript
+let socket;
+let localAudioStream;
+let localVideoStream;
+let peerConnections = {};
+let userVideoStreams = {};
+const cleanupFunctions = {};
+let userName = localStorage.getItem("userName") || "Guest";
+let mySocketId = null;
+let stopwatchInterval;
+let connectedTime;
+let availableCameras = [];
+let frontCamera;
+let backCamera;
+let currentCameraIndex = 0;
+
+const joinRoomBtn = document.getElementById("joinRoom");
+const settingsBtn = document.getElementById("settingsBtn");
+const micSwitch = document.getElementById("micSwitch");
+const videoSwitch = document.getElementById("videoSwitch");
+const flipCameraBtn = document.getElementById("flipCameraBtn");
+const updateNameBtn = document.getElementById("updateNameBtn");
+const closeModalBtn = document.getElementById("closeModal");
+const settingsModal = document.getElementById("settingsModal");
+const currentUserNameSpan = document.getElementById("currentUserName");
+const roomIdInput = document.getElementById("roomId");
+const updateUserNameInput = document.getElementById("updateUserName");
+const userListContainer = document.getElementById("userList");
+const stopwatchElement = document.getElementById("stopwatch");
+const roomContainer = document.querySelector(".room-container");
+
+if (joinRoomBtn) {
+    joinRoomBtn.addEventListener("click", joinRoom);
+}
+
+if (settingsBtn) {
+    settingsBtn.addEventListener("click", openSettings);
+}
+
+if (micSwitch) {
+    micSwitch.addEventListener("change", toggleMicrophone);
+}
+
+if (videoSwitch) {
+    videoSwitch.addEventListener("change", toggleVideo);
+}
+
+if (flipCameraBtn) {
+    flipCameraBtn.addEventListener("click", flipCamera);
+}
+
+if (updateNameBtn) {
+    updateNameBtn.addEventListener("click", updateUserName);
+}
+
+if (closeModalBtn) {
+    closeModalBtn.addEventListener("click", closeSettings);
+}
+
+if (roomIdInput) {
+    roomIdInput.addEventListener("input", function (e) {
+        this.value = this.value.replace(/[^0-9]/g, "").slice(0, 4);
+    });
+}
+
+function updateCurrentUserName() {
+    if (currentUserNameSpan) {
+        currentUserNameSpan.textContent = userName;
+    }
+}
+
+function initializePage() {
+    updateCurrentUserName();
+    if (window.location.pathname.startsWith("/room/")) {
+        const roomId = window.location.pathname.split("/").pop();
+        if (/^\d{4}$/.test(roomId)) {
+            initializeRoom(roomId);
+        } else {
+            alert("Invalid room ID. Please use a 4-digit number.");
+            window.location.href = "/";
+        }
+    }
+
+    if (roomIdInput) {
+        roomIdInput.addEventListener("keydown", function (e) {
+            if (e.key === "Enter") {
+                joinRoom();
+            }
+        });
+    }
+
+    if (updateUserNameInput) {
+        updateUserNameInput.addEventListener("keydown", function (e) {
+            if (e.key === "Enter") {
+                updateUserName();
+            }
+        });
+    }
+}
+
+function openSettings() {
+    settingsModal.style.display = "block";
+    document.getElementById("updateUserName").value = userName;
+}
+
+function closeSettings() {
+    settingsModal.style.display = "none";
+}
+
+window.onclick = function (event) {
+    if (event.target == settingsModal) {
+        closeSettings();
+    }
+};
+
+function joinRoom() {
+    const roomId = roomIdInput.value;
+
+    if (roomId.length !== 4) {
+        alert("Please enter a valid 4-digit room code.");
+        return;
+    }
+
+    if (!userName) {
+        alert("Please set your name in the settings before joining a room.");
+        openSettings();
+        return;
+    }
+
+    window.location.href = `/room/${roomId}`;
+}
+
+async function initializeRoom(roomId) {
+    if (userName === "Guest") {
+        alert("Please set your name in the settings before joining a room.");
+        await new Promise((resolve) => {
+            openSettings();
+            const nameUpdateListener = function () {
+                updateUserName();
+                updateNameBtn.removeEventListener("click", nameUpdateListener);
+                closeSettings();
+                resolve();
+            };
+            updateNameBtn.addEventListener("click", nameUpdateListener);
+        });
+    }
+
+    document.getElementById("roomDisplay").textContent = roomId;
+    document.title = `Box - ${roomId}`;
+    showLoadingAnimation();
+
+    try {
+        socket = io();
+
+        socket.on("connect", () => {
+            mySocketId = socket.id;
+            socket.emit("join-room", { roomId, userName });
+            startStopwatch();
+            startHeartbeat();
+        });
+
+        socket.on("user-connected", handleUserConnected);
+        socket.on("user-disconnected", handleUserDisconnected);
+        socket.on("update-user-list", updateUserList);
+        socket.on("offer", handleOffer);
+        socket.on("answer", handleAnswer);
+        socket.on("ice-candidate", handleNewICECandidateMsg);
+        socket.on("heartbeat", handleHeartbeat);
+        socket.on("update-ping", handleUpdatePing);
+
+        updateToggleStates();
+
+        await initializeVideoDevices();
+
+        const controlsContainer = document.createElement("div");
+        controlsContainer.className = "room-controls";
+        controlsContainer.appendChild(document.querySelector(".user-controls"));
+        document.body.appendChild(controlsContainer);
+    } catch (error) {
+        console.error("Error initializing room:", error);
+        alert(
+            "Unable to initialize the room. Please check your settings and try again.",
+        );
+        hideLoadingAnimation();
+    }
+}
+
+async function getAudioStream() {
+    if (localAudioStream) {
+        localAudioStream.getTracks().forEach((track) => track.stop());
+    }
+    localAudioStream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+    });
+    return localAudioStream;
+}
+
+async function getVideoStream() {
+    if (localVideoStream) {
+        localVideoStream.getTracks().forEach((track) => track.stop());
+    }
+    const videoConstraints = { video: true };
+    if (availableCameras.length > 0) {
+        videoConstraints.video = {
+            deviceId: availableCameras[currentCameraIndex].deviceId,
+        };
+    }
+    localVideoStream =
+        await navigator.mediaDevices.getUserMedia(videoConstraints);
+    return localVideoStream;
+}
+
+function createEmptyAudioStream() {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = ctx.createOscillator();
+    const dst = oscillator.connect(ctx.createMediaStreamDestination());
+    oscillator.start();
+    const track = dst.stream.getAudioTracks()[0];
+    track.enabled = false;
+    return new MediaStream([track]);
+}
+
+function createEmptyVideoStream() {
+    const canvas = Object.assign(document.createElement("canvas"), {
+        width: 640,
+        height: 480,
+    });
+    canvas.getContext("2d").fillRect(0, 0, canvas.width, canvas.height);
+    const stream = canvas.captureStream();
+    stream.getVideoTracks()[0].enabled = false;
+    return stream;
+}
+
+async function initializeVideoDevices() {
+    try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        availableCameras = devices.filter(
+            (device) => device.kind === "videoinput",
+        );
+
+        frontCamera = availableCameras.find((device) =>
+            device.label.toLowerCase().includes("front"),
+        );
+        backCamera = availableCameras.find((device) =>
+            device.label.toLowerCase().includes("back"),
+        );
+
+        if (frontCamera && backCamera) {
+            console.log("Front and back cameras identified");
+        } else {
+            console.log(
+                "Unable to identify front and back cameras, will cycle through all cameras",
+            );
+        }
+
+        updateFlipCameraButtonVisibility();
+    } catch (error) {
+        console.error("Error initializing video devices:", error);
+    }
+}
+
+function updateFlipCameraButtonVisibility() {
+    if (flipCameraBtn) {
+        if (availableCameras.length > 1 && videoSwitch.checked) {
+            flipCameraBtn.classList.add("visible");
+        } else {
+            flipCameraBtn.classList.remove("visible");
+        }
+    }
+}
+
+async function flipCamera() {
+    if (availableCameras.length < 2 || !videoSwitch.checked) return;
+
+    if (frontCamera && backCamera) {
+        currentCameraIndex =
+            currentCameraIndex === availableCameras.indexOf(frontCamera)
+                ? availableCameras.indexOf(backCamera)
+                : availableCameras.indexOf(frontCamera);
+    } else {
+        currentCameraIndex = (currentCameraIndex + 1) % availableCameras.length;
+    }
+
+    try {
+        const newVideoStream = await getVideoStream();
+        const [newVideoTrack] = newVideoStream.getVideoTracks();
+
+        Object.values(peerConnections).forEach((pc) => {
+            const sender = pc
+                .getSenders()
+                .find((s) => s.track && s.track.kind === "video");
+            if (sender) {
+                sender.replaceTrack(newVideoTrack);
+            }
+        });
+
+        toggleLocalVideoPreview(true);
+        socket.emit("camera-changed");
+    } catch (error) {
+        console.error("Error flipping camera:", error);
+        alert("Failed to switch camera. Please try again.");
+    }
+}
+
+function showLoadingAnimation() {
+    if (userListContainer) {
+        userListContainer.innerHTML = `
+            <div class="hexagon-loader">
+                <div class="dot"></div>
+                <div class="dot"></div>
+                <div class="dot"></div>
+                <div class="dot"></div>
+                <div class="dot"></div>
+                <div class="dot"></div>
+            </div>
+        `;
+    }
+}
+
+function hideLoadingAnimation() {
+    if (userListContainer) {
+        userListContainer.innerHTML = "";
+    }
+}
+
+function handleUserConnected(user) {
+    console.log("User connected:", user);
+    if (user.id !== mySocketId) {
+        createPeerConnection(user.id);
+        callUser(user.id);
+    }
+}
+
+function handleUserDisconnected(userId) {
+    console.log("User disconnected:", userId);
+    if (peerConnections[userId]) {
+        peerConnections[userId].close();
+        delete peerConnections[userId];
+    }
+    if (cleanupFunctions[userId]) {
+        cleanupFunctions[userId]();
+        delete cleanupFunctions[userId];
+    }
+    if (userVideoStreams[userId]) {
+        delete userVideoStreams[userId];
+    }
+    hideTalkingIndicator(userId);
+}
+
+function updateUserList(users) {
+    hideLoadingAnimation();
+    if (!userListContainer) return;
+
+    const currentUserIds = new Set(
+        Array.from(userListContainer.children).map((el) => el.dataset.userId),
+    );
+    const newUserIds = new Set(users.map((user) => user.id));
+
+    currentUserIds.forEach((userId) => {
+        if (!newUserIds.has(userId)) {
+            removeUser(userId);
+        }
+    });
+
+    users.forEach((user) => {
+        if (user.id !== mySocketId) {
+            if (currentUserIds.has(user.id)) {
+                updateUser(user);
+            } else {
+                addUser(user);
+            }
+        }
+    });
+
+    updateUserListLayout(users.length - 1);
+    updateEmptyRoomMessage();
+}
+
+function updateUserListLayout(userCount) {
+    if (!userListContainer) return;
+
+    userListContainer.className = "user-list";
+
+    if (userCount === 0) {
+        userListContainer.classList.add("empty-room");
+    } else if (userCount === 1) {
+        userListContainer.classList.add("single-user");
+    } else if (userCount === 2) {
+        userListContainer.classList.add("two-users");
+    }
+}
+
+function updateUser(user) {
+    const userItem = document.querySelector(
+        `.user-item[data-user-id="${user.id}"]`,
+    );
+    if (userItem) {
+        const nameElement = userItem.querySelector(".user-list-name");
+        const micIcon = userItem.querySelector(".mic-icon");
+        const videoIcon = userItem.querySelector(".video-icon");
+        const videoContainer = userItem.querySelector(".video-container");
+
+        if (nameElement.textContent !== user.name) {
+            nameElement.textContent = user.name;
+        }
+
+        const isMuted = micIcon.classList.contains("fa-microphone-slash");
+        if (isMuted !== user.muted) {
+            micIcon.classList.toggle("fa-microphone-slash", user.muted);
+            micIcon.classList.toggle("fa-microphone", !user.muted);
+            micIcon.classList.toggle("mic-off", user.muted);
+            micIcon.classList.toggle("mic-on", !user.muted);
+        }
+
+        const isVideoOff = videoIcon.classList.contains("fa-video-slash");
+        if (isVideoOff !== user.videoOff) {
+            videoIcon.classList.toggle("fa-video-slash", user.videoOff);
+            videoIcon.classList.toggle("fa-video", !user.videoOff);
+            videoIcon.classList.toggle("video-off", user.videoOff);
+            videoIcon.classList.toggle("video-on", !user.videoOff);
+            toggleVideoPlaceholder(videoContainer, user.videoOff);
+        }
+
+        if (userVideoStreams[user.id]) {
+            attachVideoStream(user.id, userVideoStreams[user.id]);
+        }
+    }
+}
+
+function addUser(user) {
+    const userItem = document.createElement("div");
+    userItem.className = "user-item";
+    userItem.dataset.userId = user.id;
+
+    userItem.innerHTML = `
+        <button class="menu-btn" aria-label="User Options">
+            <i class="fas fa-ellipsis-v"></i>
+        </button>
+        <div class="dropdown-menu">
+            <label class="dropdown-item">
+                Captions
+                <input type="checkbox" class="toggle-input captions-toggle" data-user-id="${user.id}" />
+                <span class="toggle-slider"></span>
+            </label>
+            <label class="dropdown-item">
+                Show Ping
+                <input type="checkbox" class="toggle-input ping-toggle" data-user-id="${user.id}" />
+                <span class="toggle-slider"></span>
+            </label>
+            <button class="fullscreen-btn dropdown-item" data-user-id="${user.id}">
+                <i class="fas fa-expand"></i> Fullscreen
+            </button>
+        </div>
+        <div class="video-container" id="video-${user.id}"></div>
+        <div class="status-bar">
+            <div class="left-container">
+                <i class="fas mic-icon fa-microphone${user.muted ? "-slash mic-off" : " mic-on"}"></i>
+                <i class="fas video-icon fa-video${user.videoOff ? "-slash video-off" : " video-on"}"></i>
+                <span class="user-list-name">${user.name}</span>
+            </div>
+            <div class="right-container">
+                <span class="ping-indicator" data-user-id="${user.id}" style="display:none;">0</span>
+                <div class="network-speed">
+                    <div class="network-bar"></div>
+                    <div class="network-bar"></div>
+                    <div class="network-bar"></div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    userListContainer.appendChild(userItem);
+
+    const videoContainer = userItem.querySelector(".video-container");
+    toggleVideoPlaceholder(videoContainer, user.videoOff);
+
+    if (userVideoStreams[user.id]) {
+        attachVideoStream(user.id, userVideoStreams[user.id]);
+    }
+
+    const menuBtn = userItem.querySelector(".menu-btn");
+    const dropdownMenu = userItem.querySelector(".dropdown-menu");
+
+    menuBtn.addEventListener("click", (event) => {
+        event.stopPropagation();
+        dropdownMenu.classList.toggle("open");
+        menuBtn.classList.toggle("menu-btn-active");
+    });
+
+    dropdownMenu.addEventListener("click", (event) => {
+        event.stopPropagation();
+    });
+
+    document.addEventListener("click", handleClickOutside);
+    document.addEventListener("touchstart", handleClickOutside);
+
+    function handleClickOutside(event) {
+        if (
+            !dropdownMenu.contains(event.target) &&
+            !menuBtn.contains(event.target) &&
+            dropdownMenu.classList.contains("open")
+        ) {
+            dropdownMenu.classList.remove("open");
+            menuBtn.classList.remove("menu-btn-active");
+        }
+    }
+
+    const captionsToggle = userItem.querySelector(".captions-toggle");
+    captionsToggle.addEventListener("change", () => {
+        const userId = captionsToggle.dataset.userId;
+        const isChecked = captionsToggle.checked;
+        toggleCaptions(userId, isChecked);
+    });
+
+    const pingToggle = userItem.querySelector(".ping-toggle");
+    pingToggle.addEventListener("change", () => {
+        const userId = pingToggle.dataset.userId;
+        const isChecked = pingToggle.checked;
+        togglePingDisplay(userId, isChecked);
+    });
+
+    const fullscreenBtn = userItem.querySelector(".fullscreen-btn");
+    fullscreenBtn.addEventListener("click", () => {
+        toggleFullscreen(videoContainer);
+    });
+}
+
+function toggleCaptions(userId, isEnabled) {
+    console.log(
+        `Captions for user ${userId} are now ${isEnabled ? "enabled" : "disabled"}.`,
+    );
+}
+
+function toggleFullscreen(element) {
+    if (!document.fullscreenElement) {
+        element.requestFullscreen().catch((err) => {
+            console.error(
+                `Error attempting to enable fullscreen mode: ${err.message} (${err.name})`,
+            );
+        });
+    } else {
+        document.exitFullscreen();
+    }
+}
+
+function toggleVideoPlaceholder(videoContainer, isVideoOff) {
+    if (isVideoOff) {
+        let placeholder = videoContainer.querySelector(
+            ".video-off-placeholder",
+        );
+        if (!placeholder) {
+            placeholder = document.createElement("div");
+            placeholder.className = "video-off-placeholder";
+            placeholder.innerHTML = '<i class="fas fa-user user-icon"></i>';
+            videoContainer.appendChild(placeholder);
+        }
+        const videoElement = videoContainer.querySelector("video");
+        if (videoElement) {
+            videoElement.style.display = "none";
+        }
+        placeholder.style.display = "flex";
+    } else {
+        const placeholder = videoContainer.querySelector(
+            ".video-off-placeholder",
+        );
+        if (placeholder) {
+            placeholder.style.display = "none";
+        }
+        const videoElement = videoContainer.querySelector("video");
+        if (videoElement) {
+            videoElement.style.display = "block";
+        }
+    }
+}
+
+function removeUser(userId) {
+    const userItem = document.querySelector(
+        `.user-item[data-user-id="${userId}"]`,
+    );
+    if (userItem) {
+        userItem.remove();
+    }
+    handleUserDisconnected(userId);
+}
+
+function updateEmptyRoomMessage() {
+    const noUsersMessage = userListContainer.querySelector(".no-users-message");
+    const hasUsers = userListContainer.querySelector(".user-item");
+
+    if (!hasUsers && !noUsersMessage) {
+        const message = document.createElement("div");
+        message.className = "no-users-message";
+        message.textContent = "You sure seem lonely...";
+        userListContainer.appendChild(message);
+    } else if (hasUsers && noUsersMessage) {
+        noUsersMessage.remove();
+    }
+}
+
+function createPeerConnection(userId) {
+    const peerConnection = new RTCPeerConnection({
+        iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+    });
+
+    peerConnection.onicecandidate = (event) => {
+        if (event.candidate) {
+            socket.emit("ice-candidate", {
+                target: userId,
+                candidate: event.candidate,
+            });
+        }
+    };
+
+    peerConnection.ontrack = (event) => {
+        if (event.track.kind === "audio") {
+            const audio = new Audio();
+            audio.srcObject = event.streams[0];
+            audio.play();
+            cleanupFunctions[userId] = detectTalking(userId, event.streams[0]);
+        } else if (event.track.kind === "video") {
+            userVideoStreams[userId] = event.streams[0];
+            attachVideoStream(userId, event.streams[0]);
+        }
+    };
+
+    peerConnection.addTrack(
+        createEmptyAudioStream().getAudioTracks()[0],
+        new MediaStream(),
+    );
+    peerConnection.addTrack(
+        createEmptyVideoStream().getVideoTracks()[0],
+        new MediaStream(),
+    );
+
+    peerConnections[userId] = peerConnection;
+
+    return peerConnection;
+}
+
+function attachVideoStream(userId, stream) {
+    const videoContainer = document.getElementById(`video-${userId}`);
+    if (videoContainer) {
+        let videoElement = videoContainer.querySelector("video");
+        if (!videoElement) {
+            videoElement = document.createElement("video");
+            videoElement.autoplay = true;
+            videoElement.playsInline = true;
+            videoContainer.appendChild(videoElement);
+        }
+        videoElement.srcObject = stream;
+
+        const userItem = videoContainer.closest(".user-item");
+        const videoIcon = userItem.querySelector(".video-icon");
+        const isVideoOff = videoIcon.classList.contains("fa-video-slash");
+        toggleVideoPlaceholder(videoContainer, isVideoOff);
+    }
+}
+
+function detectTalking(userId, stream) {
+    const audioContext = new (window.AudioContext ||
+        window.webkitAudioContext)();
+    const analyser = audioContext.createAnalyser();
+    const microphone = audioContext.createMediaStreamSource(stream);
+    const javascriptNode = audioContext.createScriptProcessor(2048, 1, 1);
+
+    analyser.smoothingTimeConstant = 0.8;
+    analyser.fftSize = 1024;
+
+    microphone.connect(analyser);
+    analyser.connect(javascriptNode);
+    javascriptNode.connect(audioContext.destination);
+
+    const checkTalking = () => {
+        const array = new Uint8Array(analyser.frequencyBinCount);
+        analyser.getByteFrequencyData(array);
+        const average = array.reduce((a, b) => a + b) / array.length;
+
+        const talkingThreshold = 10;
+        if (average > talkingThreshold) {
+            showTalkingIndicator(userId);
+        } else {
+            hideTalkingIndicator(userId);
+        }
+    };
+
+    javascriptNode.onaudioprocess = checkTalking;
+
+    return () => {
+        javascriptNode.disconnect();
+        microphone.disconnect();
+        analyser.disconnect();
+        audioContext.close();
+    };
+}
+
+function showTalkingIndicator(userId) {
+    const userItem = document.querySelector(
+        `.user-item[data-user-id="${userId}"]`,
+    );
+    if (userItem && !userItem.querySelector(".talking-indicator")) {
+        const icon = document.createElement("i");
+        icon.className = "fas fa-volume-up talking-indicator";
+        userItem.querySelector(".left-container").appendChild(icon);
+    }
+}
+
+function hideTalkingIndicator(userId) {
+    const userItem = document.querySelector(
+        `.user-item[data-user-id="${userId}"]`,
+    );
+    if (userItem) {
+        const talkingIndicator = userItem.querySelector(".talking-indicator");
+        if (talkingIndicator) {
+            talkingIndicator.remove();
+        }
+    }
+}
+
+function togglePingDisplay(userId, showPing) {
+    const pingIndicator = document.querySelector(
+        `.ping-indicator[data-user-id="${userId}"]`,
+    );
+    if (pingIndicator) {
+        pingIndicator.style.display = showPing ? "inline" : "none";
+    }
+}
+
+function updateNetworkSpeedIndicator(userId, pingTime) {
+    const userItem = document.querySelector(
+        `.user-item[data-user-id="${userId}"]`,
+    );
+    if (userItem) {
+        const bars = userItem.querySelectorAll(".network-bar");
+        const activeBarCount = pingTime < 100 ? 3 : pingTime < 300 ? 2 : 1;
+        const barClass =
+            pingTime < 100
+                ? "active"
+                : pingTime < 300
+                  ? "active medium"
+                  : "active slow";
+
+        bars.forEach((bar, index) => {
+            bar.className = `network-bar ${index < activeBarCount ? barClass : ""}`;
+        });
+    }
+}
+
+async function callUser(userId) {
+    const peerConnection = peerConnections[userId];
+    const offer = await peerConnection.createOffer();
+    await peerConnection.setLocalDescription(offer);
+    socket.emit("offer", {
+        target: userId,
+        sdp: peerConnection.localDescription,
+    });
+}
+
+async function handleOffer(data) {
+    const peerConnection = createPeerConnection(data.sender);
+    await peerConnection.setRemoteDescription(
+        new RTCSessionDescription(data.sdp),
+    );
+    const answer = await peerConnection.createAnswer();
+    await peerConnection.setLocalDescription(answer);
+    socket.emit("answer", {
+        target: data.sender,
+        sdp: peerConnection.localDescription,
+    });
+}
+
+async function handleAnswer(data) {
+    const peerConnection = peerConnections[data.sender];
+    await peerConnection.setRemoteDescription(
+        new RTCSessionDescription(data.sdp),
+    );
+}
+
+function handleNewICECandidateMsg(data) {
+    const peerConnection = peerConnections[data.sender];
+    peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+}
+
+async function toggleMicrophone() {
+    const isAudioOn = micSwitch.checked;
+    let audioTrack;
+
+    if (isAudioOn) {
+        try {
+            const audioStream = await getAudioStream();
+            audioTrack = audioStream.getAudioTracks()[0];
+        } catch (error) {
+            console.error("Error accessing microphone:", error);
+            micSwitch.checked = false;
+            updateMicIcon(false);
+            alert(
+                "Unable to access the microphone. Please check your settings and try again.",
+            );
+            return;
+        }
+    } else {
+        if (localAudioStream) {
+            localAudioStream.getTracks().forEach((track) => track.stop());
+            localAudioStream = null;
+        }
+        audioTrack = createEmptyAudioStream().getAudioTracks()[0];
+    }
+
+    Object.values(peerConnections).forEach((pc) => {
+        const sender = pc
+            .getSenders()
+            .find((s) => s.track && s.track.kind === "audio");
+        if (sender) {
+            sender.replaceTrack(audioTrack);
+        }
+    });
+
+    if (socket) {
+        socket.emit("mute-status", !isAudioOn);
+    }
+    updateMicIcon(isAudioOn);
+}
+
+async function toggleVideo() {
+    const isVideoOn = videoSwitch.checked;
+    let videoTrack;
+
+    if (isVideoOn) {
+        try {
+            const videoStream = await getVideoStream();
+            videoTrack = videoStream.getVideoTracks()[0];
+
+            await initializeVideoDevices();
+        } catch (error) {
+            console.error("Error accessing camera:", error);
+            videoSwitch.checked = false;
+            updateVideoIcon(false);
+            alert(
+                "Unable to access the camera. Please check your settings and try again.",
+            );
+            return;
+        }
+    } else {
+        if (localVideoStream) {
+            localVideoStream.getTracks().forEach((track) => track.stop());
+            localVideoStream = null;
+        }
+        videoTrack = createEmptyVideoStream().getVideoTracks()[0];
+    }
+
+    Object.values(peerConnections).forEach((pc) => {
+        const sender = pc
+            .getSenders()
+            .find((s) => s.track && s.track.kind === "video");
+        if (sender) {
+            sender.replaceTrack(videoTrack);
+        }
+    });
+
+    if (socket) {
+        socket.emit("video-status", !isVideoOn);
+    }
+    updateVideoIcon(isVideoOn);
+    toggleLocalVideoPreview(isVideoOn);
+    updateFlipCameraButtonVisibility();
+}
+
+function updateToggleStates() {
+    toggleMicrophone();
+    toggleVideo();
+}
+
+function updateMicIcon(isOn) {
+    const micIcon = document.querySelector("#micToggle .mic-icon");
+    if (micIcon) {
+        if (isOn) {
+            micIcon.classList.remove("fa-microphone-slash", "mic-off");
+            micIcon.classList.add("fa-microphone", "mic-on");
+        } else {
+            micIcon.classList.remove("fa-microphone", "mic-on");
+            micIcon.classList.add("fa-microphone-slash", "mic-off");
+        }
+    }
+}
+
+function updateVideoIcon(isOn) {
+    const videoIcon = document.querySelector("#videoToggle .video-icon");
+    if (videoIcon) {
+        if (isOn) {
+            videoIcon.classList.remove("fa-video-slash", "video-off");
+            videoIcon.classList.add("fa-video", "video-on");
+        } else {
+            videoIcon.classList.remove("fa-video", "video-on");
+            videoIcon.classList.add("fa-video-slash", "video-off");
+        }
+    }
+}
+
+function toggleLocalVideoPreview(isOn) {
+    const localVideoPreview = document.getElementById("localVideoPreview");
+    if (localVideoPreview) {
+        if (isOn && localVideoStream) {
+            localVideoPreview.srcObject = localVideoStream;
+            localVideoPreview.style.display = "block";
+        } else {
+            localVideoPreview.srcObject = null;
+            localVideoPreview.style.display = "none";
+        }
+    }
+}
+
+if (micSwitch) {
+    updateMicIcon(micSwitch.checked);
+}
+
+if (videoSwitch) {
+    updateVideoIcon(videoSwitch.checked);
+}
+
+function updateUserName() {
+    const newName = document.getElementById("updateUserName").value.trim();
+    if (newName && newName !== userName) {
+        userName = newName;
+        localStorage.setItem("userName", userName);
+        updateCurrentUserName();
+        if (socket) {
+            socket.emit("update-user-name", newName);
+        }
+        closeSettings();
+    } else if (!newName) {
+        userName = `Guest`;
+        localStorage.setItem("userName", userName);
+        updateCurrentUserName();
+        if (socket) {
+            socket.emit("update-user-name", userName);
+        }
+        closeSettings();
+    } else {
+        closeSettings();
+    }
+}
+
+function startStopwatch() {
+    connectedTime = new Date();
+    stopwatchInterval = setInterval(updateStopwatch, 1000);
+}
+
+function updateStopwatch() {
+    const now = new Date();
+    const elapsedTime = Math.floor((now - connectedTime) / 1000);
+    const hours = String(Math.floor(elapsedTime / 3600)).padStart(2, "0");
+    const minutes = String(Math.floor((elapsedTime % 3600) / 60)).padStart(
+        2,
+        "0",
+    );
+    const seconds = String(elapsedTime % 60).padStart(2, "0");
+    stopwatchElement.textContent = `${hours}:${minutes}:${seconds}`;
+}
+
+function startHeartbeat() {
+    setInterval(() => {
+        if (socket) {
+            socket.emit("heartbeat", Date.now());
+        }
+    }, 1000);
+}
+
+function handleHeartbeat({ senderId, timestamp }) {
+    const receiveTime = Date.now();
+    const roundTripTime = receiveTime - timestamp;
+    socket.emit("heartbeat-ack", { targetId: senderId, roundTripTime });
+}
+
+function handleUpdatePing({ senderId, pingTime }) {
+    updateNetworkSpeedIndicator(senderId, pingTime);
+
+    const pingIndicator = document.querySelector(
+        `.ping-indicator[data-user-id="${senderId}"]`,
+    );
+    if (pingIndicator && pingIndicator.style.display === "inline") {
+        pingIndicator.textContent = `${pingTime}`;
+    }
+}
+
+document.addEventListener("DOMContentLoaded", initializePage);
+
+```
+
+public\index.html
+```html
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Box</title>
+        <link rel="stylesheet" href="styles.css" />
+        <link
+            rel="stylesheet"
+            href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css"
+        />
+    </head>
+    <body>
+        <div class="container">
+            <div class="top-row home-top-row">
+                <button id="settingsBtn" class="btn-icon" aria-label="Settings">
+                    <i class="fas fa-cog"></i>
+                </button>
+            </div>
+            <h1>Box <span class="subtitle">Audio & Video Chat</span></h1>
+            <p class="user-info">
+                Hello, <span id="currentUserName" class="user-name"></span>!
+                <span class="settings-link" onclick="openSettings()"
+                    >Change name</span
+                >
+            </p>
+            <div class="form-group">
+                <label for="roomId">Room Number:</label>
+                <input
+                    type="text"
+                    id="roomId"
+                    placeholder="Enter 4-digit room code"
+                    maxlength="4"
+                    pattern="\d{4}"
+                />
+            </div>
+            <button id="joinRoom" class="btn-primary">Join Room</button>
+        </div>
+        <div id="settingsModal" class="modal">
+            <div class="modal-content">
+                <h2>Settings</h2>
+                <div class="form-group">
+                    <label for="updateUserName">Your Name:</label>
+                    <input
+                        type="text"
+                        id="updateUserName"
+                        placeholder="Enter your name"
+                    />
+                </div>
+                <button id="updateNameBtn" class="btn-primary">Update</button>
+                <button id="closeModal" class="btn-secondary">Close</button>
+            </div>
+        </div>
+        <script src="client.js"></script>
+    </body>
+</html>
+
+```
+
+public\room.html
+```html
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Box</title>
+        <link rel="stylesheet" href="/styles.css" />
+        <link
+            rel="stylesheet"
+            href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css"
+        />
+    </head>
+    <body>
+        <div class="container room-container">
+            <div class="top-row room-top-row">
+                <a href="/" class="back-arrow"
+                    ><i class="fas fa-arrow-left"></i
+                ></a>
+                <div class="page-title">Box</div>
+                <button id="settingsBtn" class="btn-icon" aria-label="Settings">
+                    <i class="fas fa-cog"></i>
+                </button>
+            </div>
+            <div class="room-header">
+                <div class="room-info">
+                    <h1>Room: <span id="roomDisplay"></span></h1>
+                    <div class="user-info">
+                        <span id="currentUserName" class="user-name"></span>
+                        <span id="stopwatch" class="stopwatch">00:00:00</span>
+                    </div>
+                </div>
+                <div class="video-preview-container">
+                    <video
+                        id="localVideoPreview"
+                        autoplay
+                        muted
+                        playsinline
+                    ></video>
+                </div>
+            </div>
+            <div id="userList" class="user-list"></div>
+            <div class="user-controls">
+                <div id="micToggle" class="toggle-wrapper">
+                    <input
+                        type="checkbox"
+                        id="micSwitch"
+                        class="toggle-input"
+                    />
+                    <label for="micSwitch" class="toggle-label">
+                        <span class="toggle-button"></span>
+                    </label>
+                    <i class="fas fa-microphone mic-icon mic-on"></i>
+                </div>
+                <div id="videoToggle" class="toggle-wrapper">
+                    <input
+                        type="checkbox"
+                        id="videoSwitch"
+                        class="toggle-input"
+                    />
+                    <label for="videoSwitch" class="toggle-label">
+                        <span class="toggle-button"></span>
+                    </label>
+                    <i class="fas fa-video video-icon video-off"></i>
+                </div>
+                <button
+                    id="flipCameraBtn"
+                    class="btn-icon"
+                    aria-label="Flip Camera"
+                >
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+            </div>
+        </div>
+        <div id="settingsModal" class="modal">
+            <div class="modal-content">
+                <h2>Settings</h2>
+                <div class="form-group">
+                    <label for="updateUserName">Your Name:</label>
+                    <input
+                        type="text"
+                        id="updateUserName"
+                        placeholder="Enter your name"
+                    />
+                </div>
+                <button id="updateNameBtn" class="btn-primary">Update</button>
+                <button id="closeModal" class="btn-secondary">Close</button>
+            </div>
+        </div>
+        <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+        <script src="/client.js"></script>
+    </body>
+</html>
+
+```
+
+public\styles.css
+```css
+:root {
+  --bg-color: #121212;
+  --surface-color: #1e1e1e;
+  --on-surface-color: #e0e0e0;
+  --primary-color: #bb86fc;
+  --primary-variant: #3700b3;
+  --secondary-color: #03dac6;
+  --text-color: #ffffff;
+  --text-secondary: #b0b0b0;
+  --error-color: #cf6679;
+  --green-color: #4CAF50;
+  --yellow-color: #FFEB3B;
+  --red-color: #F44336;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+@font-face {
+  font-family: "Poly Sans";
+  src: url('/fonts/PolySans Neutral.ttf'); format('truetype');
+}
+@font-face {
+  font-family: "Poly Sans Bulky";
+  src: url('/fonts/PolySans Bulky.ttf'); format('truetype');
+}
+@font-face {
+  font-family: "Poly Sans Slim";
+  src: url('/fonts/PolySans Slim.ttf'); format('truetype');
+}
+
+body {
+  font-family: 'Poly Sans', 'Roboto', 'Arial', sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.6;
+}
+
+.container {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 2rem;
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+h1, .page-title {
+  font-family: 'Poly Sans Bulky', 'Roboto', 'Arial', sans-serif;
+}
+
+.subtitle, .user-info, .label, .settings-link, .user-item {
+  font-family: 'Poly Sans Slim', 'Roboto', 'Arial', sans-serif;
+}
+
+h1 {
+  text-align: center;
+  color: var(--primary-color);
+  margin-bottom: 1.5rem;
+  font-size: 2.5rem;
+}
+
+.subtitle {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  display: block;
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+label {
+  display: block;
+  color: var(--text-color);
+  font-weight: 500;
+}
+
+input[type="text"] {
+  width: 100%;
+  padding: 0.75rem;
+  background-color: var(--surface-color);
+  border: 1px solid var(--primary-color);
+  border-radius: 4px;
+  color: var(--text-color);
+  font-size: 1rem;
+  transition: border-color 0.3s ease;
+}
+
+input[type="text"]:focus {
+  outline: none;
+  border-color: var(--secondary-color);
+}
+
+.btn-primary, .btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 25px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+  font-family: 'Poly Sans', 'Roboto', 'Arial', sans-serif;
+}
+
+.btn-primary {
+  background-color: var(--primary-color);
+  color: var(--bg-color);
+  box-shadow: 0 4px 6px rgba(187, 134, 252, 0.3);
+}
+
+.btn-secondary {
+  background-color: var(--surface-color);
+  color: var(--primary-color);
+  border: 2px solid var(--primary-color);
+  box-shadow: 0 4px 6px rgba(187, 134, 252, 0.2);
+}
+
+.btn-primary:hover, .btn-secondary:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 8px rgba(187, 134, 252, 0.4);
+}
+
+.btn-primary:active, .btn-secondary:active {
+  transform: translateY(1px);
+  box-shadow: 0 2px 4px rgba(187, 134, 252, 0.4);
+}
+
+.btn-primary::after, .btn-secondary::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  background: rgba(255, 255, 255, 0.5);
+  opacity: 0;
+  border-radius: 100%;
+  transform: scale(1, 1) translate(-50%);
+  transform-origin: 50% 50%;
+}
+
+@keyframes ripple {
+  0% {
+    transform: scale(0, 0);
+    opacity: 1;
+  }
+  20% {
+    transform: scale(25, 25);
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(40, 40);
+  }
+}
+
+.btn-primary:focus:not(:active)::after,
+.btn-secondary:focus:not(:active)::after {
+  animation: ripple 1s ease-out;
+}
+
+#updateNameBtn {
+  background-color: var (--secondary-color);
+  color: var(--bg-color);
+}
+
+#closeModal {
+  background-color: var(--surface-color);
+  color: var(--text-color);
+  border: 2px solid var(--text-color);
+}
+
+#joinRoom {
+  background-image: linear-gradient(45deg, var(--primary-color), var(--secondary-color));
+  color: var(--bg-color);
+  font-size: 1.1rem;
+  padding: 1rem 2rem;
+  position: relative;
+  z-index: 1;
+  transition: all 0.3s ease;
+}
+
+#joinRoom::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background-image: linear-gradient(45deg, var(--secondary-color), var(--primary-color));
+  z-index: -1;
+  transition: opacity 0.5s ease;
+  opacity: 0;
+}
+
+#joinRoom:hover::before {
+  opacity: 1;
+}
+
+#joinRoom:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 8px rgba(187, 134, 252, 0.4);
+}
+
+.user-info {
+  text-align: left;
+  margin-bottom: 1rem;
+  color: var(--text-secondary);
+}
+
+.user-controls {
+  position: fixed;
+  height: 70px;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: var(--surface-color);
+  padding: 10px 20px;
+  border-radius: 25px;
+  box-shadow: 0px 0px 2px black;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  z-index: 1000;
+}
+
+.user-list {
+  flex-grow: 1;
+  display: grid;
+  gap: 1rem;
+  height: 100%;
+  width: 100%;
+  justify-content: center;
+}
+
+.user-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: 100%;
+  max-height: 70vh;
+  aspect-ratio: 16 / 9;
+  justify-self: center;
+  width: 100%;
+}
+
+.menu-btn {
+  background-color: var(--surface-color);
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--primary-color);
+  font-size: 1.5rem;
+  padding: 0.5rem;
+  transition: background-color 0.3s ease;
+  display: none;
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  z-index: 1;
+}
+
+.user-item:hover .menu-btn,
+.menu-btn-active {
+  display: block;
+}
+
+.user-item:hover .menu-btn {
+  display: block;
+}
+
+.menu-btn:hover {
+  background-color: var(--primary-variant);
+}
+
+.fas .fa-ellipsis-v {
+  width: 10px;
+}
+
+.dropdown-menu {
+  display: none;
+  position: absolute;
+  top: 50px;
+  right: 5px;
+  background-color: var(--surface-color);
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  z-index: 2;
+  width: 150px;
+  padding: 0.5rem 0;
+}
+
+.dropdown-menu.open {
+  display: block;
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 5px;
+  padding: 0.5rem 1rem;
+  color: var(--text-color);
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.toggle-input {
+  display: none;
+}
+
+.toggle-slider {
+  width: 50px;
+  height: 25px;
+  background-color: var(--text-secondary);
+  border-radius: 25px;
+  position: relative;
+  transition: background-color 0.3s;
+  cursor: pointer;
+}
+
+.toggle-slider:before {
+  content: "";
+  position: absolute;
+  width: 21px;
+  height: 21px;
+  border-radius: 50%;
+  background-color: var(--bg-color);
+  top: 2px;
+  left: 2px;
+  transition: transform 0.3s;
+}
+
+.captions-toggle:checked + .toggle-slider {
+  background-color: var(--primary-color);
+}
+
+.captions-toggle:checked + .toggle-slider:before {
+  transform: translateX(25px);
+}
+
+.fullscreen-btn {
+  display: flex;
+  align-items: center;
+  justify-content: start;
+  gap: 5px;
+  padding: 0.5rem 1rem;
+  color: var(--text-color);
+  font-size: 1rem;
+  cursor: pointer;
+  background: none;
+  border: none;
+  width: 100%;
+  text-align: left;
+  transition: background-color 0.3s ease;
+}
+
+.fullscreen-btn i {
+  margin-right: 0.5rem;
+}
+
+@media (max-width: 768px) {
+    .dropdown-menu {
+        width: 180px;
+        top: 60px;
+    }
+
+    .dropdown-item {
+        font-size: 1.1rem;
+    }
+
+    .menu-btn {
+        width: 50px;
+        height: 50px;
+    }
+}
+
+.video-off-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #000;
+}
+
+.user-icon {
+  font-size: 48px;
+  color: #fff;
+}
+
+.video-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 12px;
+  overflow: hidden;
+  background-color: #000;
+}
+
+.video-container video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: none;
+}
+
+.user-item .video-container video {
+  display: block;
+}
+
+.user-item .status-bar {
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+.status-bar {
+  padding: 0.5rem 1rem;
+  background-color: var(--surface-color);
+  color: var(--text-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-radius: 12px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.left-container i {
+  margin-right: 1em;
+}
+
+.left-container, .right-container {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+@media (min-width: 768px) {
+  .user-list {
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+  }
+
+  .user-list.single-user .user-item {
+    max-height: calc(100vh - 200px);
+    max-width: 800px;
+    width: 100%;
+  }
+
+  .user-list.two-users .user-item {
+    max-height: calc(50vh - 100px);
+    max-width: 600px;
+    width: 100%;
+  }
+}
+
+@media (max-width: 767px) {
+  .user-list {
+      grid-template-columns: 1fr;
+      gap: 1rem;
+  }
+
+  .user-item {
+      max-height: 50vh;
+  }
+}
+
+.room-controls {
+    display: flex;
+    justify-content: center;
+    padding: 1rem 0;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+}
+
+.mic-on {
+  color: var(--green-color);
+}
+
+.mic-off {
+  color: var(--red-color);
+}
+
+.video-on {
+  color: var(--green-color);
+}
+
+.video-off {
+  color: var(--red-color);
+}
+
+.talking-indicator {
+  color: var(--secondary-color);
+  font-size: 1rem;
+  margin-left: 1em;
+}
+
+.network-speed {
+  display: flex;
+  margin-right: 0.5em;
+  align-items: center;
+}
+
+.network-bar {
+  width: 4px;
+  height: 8px;
+  margin-right: 2px;
+  background-color: var(--text-secondary);
+  border-radius: 1px;
+}
+
+.network-bar.active {
+  background-color: var(--green-color);
+}
+
+.network-bar.active.medium {
+  background-color: var(--yellow-color);
+}
+
+.network-bar.active.slow {
+  background-color: var(--error-color);
+}
+
+.ping-indicator {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-right: 0.5em;
+}
+
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 1000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0,0,0,0.5);
+  overflow: auto;
+}
+
+.modal-content {
+  background-color: var(--surface-color);
+  margin: 15% auto;
+  padding: 2rem;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 400px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.btn-icon {
+  background: none;
+  border: none;
+  color: var(--primary-color);
+  cursor: pointer;
+  font-size: 1.5rem;
+  padding: 0.5rem;
+  transition: color 0.3s ease;
+}
+
+.btn-icon:hover {
+  color: var(--secondary-color);
+}
+
+.back-arrow {
+  color: var(--primary-color);
+  font-size: 1.5rem;
+  margin-right: 1rem;
+  text-decoration: none;
+  transition: color 0.3s ease;
+}
+
+.back-arrow:hover {
+  color: var(--secondary-color);
+}
+
+.page-title {
+  font-weight: bold;
+  font-size: 1.4em;
+  color: var(--primary-color);
+}
+
+.user-name {
+  font-weight: bold;
+  color: var(--primary-color);
+  margin-right: 0.2em;
+}
+
+.user-list-name {
+
+}
+
+.settings-link {
+  color: var(--secondary-color);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.settings-link:hover {
+  color: var(--primary-color);
+}
+
+.toggle-wrapper {
+  display: flex;
+  align-items: center;
+}
+
+.toggle-input {
+  display: none;
+}
+
+.toggle-label {
+  display: inline-block;
+  width: 60px;
+  height: 34px;
+  background-color: var(--bg-color);
+  border-radius: 17px;
+  position: relative;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.toggle-button {
+  width: 26px;
+  height: 26px;
+  background-color: var(--text-color);
+  border-radius: 50%;
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  transition: transform 0.3s ease, background-color 0.3s ease;
+}
+
+.toggle-input:checked + .toggle-label {
+  background-color: var(--primary-variant);
+}
+
+.toggle-input:checked + .toggle-label .toggle-button {
+  transform: translateX(26px);
+  background-color: var(--primary-color);
+}
+
+.mic-icon {
+  font-size: 1.2rem;
+  width: 30px;
+  text-align: center;
+  margin-left: 0.5rem;
+  transition: color 0.3s ease;
+}
+
+.video-icon {
+  font-size: 1.2rem;
+  width: 30px;
+  text-align: center;
+  margin-left: 0.5rem;
+  transition: color 0.3s ease;
+}
+
+#flipCameraBtn {
+  display: none;
+  width:
+  margin-left: 0.5rem;
+}
+
+#flipCameraBtn.visible {
+  display: inline-block;
+}
+
+.room-container {
+  margin-bottom: 120px;
+  max-width: 100%;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  margin-bottom: 1em;
+}
+
+.room-header {
+  margin-bottom: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.room-info {
+  flex: 1;
+}
+
+.video-preview-container {
+  align-self: center;
+  width: 120px;
+  height: 90px;
+  overflow: visible;
+  border-radius: 8px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+#localVideoPreview {
+  max-width: 120px;
+  max-height: 90px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+.room-header h1 {
+  text-align: left;
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.stopwatch {
+    color: var(--text-secondary);
+}
+
+.hexagon-loader {
+    position: relative;
+    width: 100px;
+    height: 86.6px;
+    margin: 20px auto;
+}
+
+.hexagon-loader .dot {
+    position: absolute;
+    width: 15px;
+    height: 15px;
+    background-color: var(--primary-color);
+    border-radius: 50%;
+    animation-duration: 0.7s;
+    animation-iteration-count: infinite;
+    animation-timing-function: ease-in-out;
+}
+
+.hexagon-loader .dot:nth-child(odd) {
+    animation-name: glowFadeOdd;
+}
+
+.hexagon-loader .dot:nth-child(even) {
+    animation-name: glowFadeEven;
+}
+
+.dot:nth-child(1) { top: 0; left: 50%; transform: translateX(-50%); }
+.dot:nth-child(2) { top: 23%; left: 79.5%; transform: translateX(-50%); }
+.dot:nth-child(3) { bottom: 23%; left: 79.5%; transform: translateX(-50%); }
+.dot:nth-child(4) { bottom: 0; left: 50%; transform: translateX(-50%); }
+.dot:nth-child(5) { bottom: 23%; left: 20.5%; transform: translateX(-50%); }
+.dot:nth-child(6) { top: 23%; left: 20.5%; transform: translateX(-50%); }
+
+@keyframes glowFadeOdd {
+    0%, 100% { 
+        box-shadow: 0 0 5px 2px rgba(187, 134, 252, 0.7);
+        opacity: 1;
+        transform: scale(1.4);
+    }
+    50% { 
+        box-shadow: none;
+        opacity: 0.5;
+        transform: scale(1);
+    }
+}
+
+@keyframes glowFadeEven {
+    0%, 100% { 
+        box-shadow: none;
+        opacity: 0.5;
+        transform: scale(1);
+    }
+    50% { 
+        box-shadow: 0 0 5px 2px rgba(187, 134, 252, 0.7);
+        opacity: 1;
+        transform: scale(1.4);
+    }
+}
+
+.loading-animation {
+    display: none;
+}
+
+@keyframes spin {
+  to {
+      transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 768px) {
+  .container {
+      padding: 1rem;
+  }
+
+  .modal-content {
+      margin: 10% auto;
+      width: 95%;
+  }
+
+  .user-controls {
+      padding: 10px;
+      gap: 10px;
+  }
+
+  .stopwatch {
+    text-align: center;
+  }
+}
+
+.home-top-row {
+  justify-content: flex-end;
+}
+
+.room-top-row {
+  justify-content: space-between;
+}
+
+.no-users-message {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+    font-size: 1.5rem;
+    color: var(--text-secondary);
+}
+
+```
+
+This all works well, but I do not like my current setup. I have an API server that runs at `api.totob12.com`, and I want the backend of Box to run there (along with all my other projects' backends). I want my frontend to just use the static files, communicating with the API server. Here is the current API server:
+
+server.js
+```javascript
+require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
+const cookieParser = require('cookie-parser');
+
+const mainRouter = require('./main');
+const depotRouter = require('./depot');
+const searchRouter = require('./search');
+const cariRouter = require('./cari');
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.use(express.json({ limit: '1gb' }));
+app.use(express.urlencoded({ limit: '1gb', extended: true }));
+app.use(cookieParser());
+
+app.use(cors({
+    origin: [
+        'http://127.0.0.1:5500',
+        'https://totob12.com',
+        'https://depot.totob12.com',
+        'https://search.totob12.com',
+        'https://chat.totob12.com',
+        'https://cari-beta.vercel.app'
+    ],
+    methods: ['GET', 'POST', 'OPTIONS'],
+    allowedHeaders: ['Authorization', 'Content-Type'],
+    credentials: true
+}));
+
+app.use('/depot', depotRouter);
+app.use('/search', searchRouter);
+app.use('/cari', cariRouter);
+app.use('/', mainRouter);
+
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`TotoB12 API server is running on port ${PORT}`);
+});
+```
+
+main.js
+```javascript
+const express = require('express');
+const axios = require('axios');
+const router = express.Router();
+const sharp = require('sharp');
+const { MsEdgeTTS, OUTPUT_FORMAT } = require('msedge-tts');
+const xmlEscape = require('xml-escape');
+
+router.get("/image/*", async (req, res) => {
+    const imageUrl = decodeURIComponent(req.params[0]);
+    const { p } = req.query;
+
+    try {
+        const imageResponse = await axios({
+            method: 'get',
+            url: imageUrl,
+            responseType: 'stream',
+            headers: {
+                "User-Agent":
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+                    "(KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0",
+            },
+        });
+
+        const contentType = imageResponse.headers["content-type"];
+        res.set("Content-Type", contentType);
+
+        if (p) {
+            const pixels = parseInt(p, 10);
+            const transformer = sharp().resize(pixels, pixels, { fit: 'inside' });
+
+            imageResponse.data.pipe(transformer).pipe(res);
+        } else {
+            imageResponse.data.pipe(res);
+        }
+    } catch (error) {
+        console.error("Failed to retrieve the image:", error.code);
+        res.status(500).send("Failed to retrieve image");
+    }
+});
+
+router.post('/tts', async (req, res) => {
+    try {
+        const { text } = req.body;
+        if (!text) {
+            return res.status(400).json({ error: 'Text is required' });
+        }
+
+        const tts = new MsEdgeTTS();
+        await tts.setMetadata("en-US-AnaNeural", OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
+
+        res.setHeader('Content-Type', 'audio/mpeg');
+        res.setHeader('Transfer-Encoding', 'chunked');
+
+        const readable = tts.toStream(xmlEscape(text));
+        readable.pipe(res);
+
+        readable.on('error', (error) => {
+            console.error('TTS Stream Error:', error);
+            if (!res.headersSent) {
+                res.status(500).json({ error: 'Failed to generate speech' });
+            }
+        });
+    } catch (error) {
+        console.error('TTS Error:', error);
+        if (!res.headersSent) {
+            res.status(500).json({ error: 'Failed to generate speech' });
+        }
+    }
+});
+
+router.get("/wolframalpha", async (req, res) => {
+    const { query } = Buffer.from(req.query, 'base64').toString('utf-8');
+    if (!query) {
+        return res.status(400).json({ error: 'Query is required' });
+    }
+
+    const url = `https://www.wolframalpha.com/api/v1/llm-api?appid=${process.env.WOLFRAM_ALPHA_ALL_APP_ID}&units=metric&input=${encodeURIComponent(query)}`;
+    console.log(url);
+    try {
+        const response = await axios.get(url);
+        res.set('Content-Type', 'text/plain');
+        res.send(response.data);
+    } catch (error) {
+        console.error('Error querying Wolfram Alpha:', error);
+        res.status(500).json({ error: error });
+    }
+});
+
+router.get('/generate-image', async (req, res) => {
+    try {
+        const { Client } = await import('@gradio/client');
+
+        const { prompt } = req.query;
+        if (!prompt) {
+            return res.status(400).json({ error: 'Prompt is required in the request body.' });
+        }
+
+        // const app = await Client.connect("black-forest-labs/FLUX.1-schnell");
+        const app = await Client.connect("https://TotoB12-Fast-Flux.hf.space/");
+
+        // const result = await app.predict("/infer", {
+        //     prompt: prompt,
+        //     seed: 0,
+        //     randomize_seed: true,
+        //     width: 1024,
+        //     height: 1024,
+        //     num_inference_steps: 4,
+        // });
+        const result = await app.predict("/predict", {
+            param_0: Buffer.from(prompt, 'base64').toString('utf-8'),
+        });
+
+
+        res.status(200).json({ result: result.data });
+    } catch (error) {
+        console.error('Error in /generate-image:', error);
+        res.status(500).json({ error: 'Internal Server Error.' });
+    }
+});
+
+router.get('/health', (req, res) => {
+    res.status(200).json({ status: 'Upload server is running.' });
+});
+
+module.exports = router;
+```
+
+cari.js
+```javascript
+// cari.js
+require('dotenv').config();
+const express = require('express');
+const router = express.Router();
+const webpush = require('web-push');
+
+// Retrieve your VAPID keys from environment variables
+const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
+
+webpush.setVapidDetails(
+  'mailto:antonin@beliard.io',
+  VAPID_PUBLIC_KEY,
+  VAPID_PRIVATE_KEY
+);
+
+// In-memory storage for subscriptions
+let subscriptions = [];
+
+/**
+ * Subscribe endpoint
+ * Stores the subscription object in the in-memory array.
+ */
+router.post('/subscribe', (req, res) => {
+  const subscription = req.body;
+  const idx = subscriptions.findIndex(sub => sub.endpoint === subscription.endpoint);
+  if (idx === -1) {
+    subscriptions.push(subscription);
+  }
+  // Could send back the subscription data or just an empty object
+  res.status(201).json({});
+});
+
+/**
+ * Unsubscribe endpoint
+ * Removes subscription from in-memory array by matching endpoint.
+ */
+router.post('/unsubscribe', (req, res) => {
+  const { endpoint } = req.body;
+  subscriptions = subscriptions.filter(sub => sub.endpoint !== endpoint);
+  res.status(200).json({});
+});
+
+/**
+ * Send notification
+ * Loops through all stored subscriptions and sends a push message.
+ */
+router.post('/send-notification', (req, res) => {
+  const { title, body } = req.body;
+  const payload = JSON.stringify({ title, body });
+
+  const promises = subscriptions.map(sub => 
+    webpush.sendNotification(sub, payload).catch(err => console.error(err))
+  );
+  
+  Promise.all(promises)
+    .then(() => res.sendStatus(200))
+    .catch(() => res.sendStatus(500));
+});
+
+module.exports = router;
+```
+
+I want you to fully develop and implement this, returning all the needed files and changes.
