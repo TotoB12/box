@@ -2168,7 +2168,7 @@ input[type="text"]:focus {
 
 ```
 
-This all works well, but I do not like my current setup. I have an API server that runs at `api.totob12.com`, and I want the backend of Box to run there (along with all my other projects' backends). I want my frontend to just use the static files, communicating with the API server. Here is the current API server:
+This all works well, but I do not like my current setup. I have an API server that runs at `api.totob12.com`, and I want the backend of Box to run there (along with all my other projects' backends). I want my frontend to just use the static files, communicating with the API server. My API uses `api.totob12.com`, and I want the Box services to run on `api.totob12.com/box`. Here is the current API server:
 
 server.js
 ```javascript
@@ -2407,4 +2407,4 @@ router.post('/send-notification', (req, res) => {
 module.exports = router;
 ```
 
-I want you to fully develop and implement this, returning all the needed files and changes.
+But this will not be enough. I also need the frontend to use a simple Node.JS server, to be able to handle `/room` endpoints. This frontend will run on `box.totob12.com`. I want you to fully develop and implement this, returning all the needed files and changes.
