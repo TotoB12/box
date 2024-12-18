@@ -149,7 +149,7 @@ async function initializeRoom(roomId) {
     showLoadingAnimation();
 
     try {
-        socket = io();
+        socket = io("https://api.totob12.com", { path: "/box/socket.io" });
 
         socket.on("connect", () => {
             mySocketId = socket.id;
